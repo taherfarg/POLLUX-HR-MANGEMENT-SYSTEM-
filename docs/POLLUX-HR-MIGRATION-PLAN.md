@@ -22,6 +22,9 @@ repository (Phase 0). It records what exists, what stays, what changes, and why.
 | Original Matajer version | branch `main` at commit `2f0b71e` — untouched |
 | Pollux HR version | branch `claude/happy-babbage-yhcq6t`, built on top of `main` |
 
+> **Update:** Pollux HR has since moved, with its full history, to its own repository:
+> https://github.com/taherfarg/POLLUX-HR-MANGEMENT-SYSTEM-. The Matajer repository keeps the original product on `main`.
+
 Nothing is force-pushed and `main` is never modified. `git checkout main` returns the
 Matajer product exactly as it was. Every Pollux change is a normal commit, so any
 single stage can be inspected or reverted on its own.

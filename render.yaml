@@ -4,9 +4,9 @@
 #   - pollux-hr-api    the Express API, built from the backend Dockerfile
 #   - pollux-hr-web    the React frontend, built by Vite and served as a static site
 #
-# The names differ from the original Matajer blueprint on `main` (ems-api,
-# ems-web) on purpose: a Blueprint created from this branch creates new services
-# and can never take over, redeploy or overwrite the live Matajer demo.
+# The names differ from the Matajer demo's blueprint (ems-api, ems-web) on
+# purpose: both can live in one Render account, and deploying Pollux HR never
+# takes over, redeploys or overwrites the Matajer services.
 #
 # The database is NOT defined here. Render's own Postgres expires on the free
 # plan, so the database lives on Neon (free, no expiry) and is supplied through
@@ -16,8 +16,7 @@
 # API and the database on the same continent matters: every request makes
 # several round trips, and a cross-hemisphere hop shows up as visible lag.
 #
-# Apply with: Render Dashboard -> New -> Blueprint -> this repository, and pick
-# the Pollux HR branch (not main).
+# Apply with: Render Dashboard -> New -> Blueprint -> this repository (branch main).
 
 services:
   - type: web

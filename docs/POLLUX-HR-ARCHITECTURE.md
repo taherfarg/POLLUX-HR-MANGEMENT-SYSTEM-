@@ -21,10 +21,10 @@ the audit that preceded it are in [POLLUX-HR-MIGRATION-PLAN.md](POLLUX-HR-MIGRAT
 | Files | pdfkit (payslips, PDF reports), exceljs (Excel reports), CSV with BOM |
 | Tests | Vitest + Supertest against real Postgres · Vitest (frontend) · Playwright (E2E) |
 
-**Branches.** `main` is the original Matajer product, untouched. Pollux HR lives on its
-own branch, built as ordinary commits on top of it, so either version can be checked out
-at any time. Database changes are additive migrations: the Matajer tables and columns are
-all still there.
+**History.** Pollux HR began as a branch of the
+[Matajer People Hub repository](https://github.com/taherfarg/matajer-employee-management-platform), where the original product remains
+unchanged on `main`, and moved here with its full commit history. Database changes are
+additive migrations: the Matajer tables and columns are all still there.
 
 ---
 

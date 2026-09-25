@@ -2,11 +2,10 @@
 
 Gets Pollux HR to a public URL in about fifteen minutes, on free tiers only. No card required.
 
-> **Deploying next to the Matajer demo.** The blueprint on this branch creates its own
-> services, `pollux-hr-api` and `pollux-hr-web`, so it can never touch the original
-> `ems-api` / `ems-web` deployment from `main`. Two things keep them apart:
-> choose **this branch** (not `main`) when creating the Blueprint, and give Pollux
-> **its own database** — the seed replaces all demo data in the database it runs against.
+> **Next to the Matajer demo.** This blueprint creates its own services, `pollux-hr-api`
+> and `pollux-hr-web`, so it can share a Render account with the Matajer demo
+> (`ems-api` / `ems-web`) without touching it. Give Pollux **its own database** — the
+> seed replaces all demo data in the database it runs against.
 
 **Why this split:** Render's own Postgres expires after 30 days on the free plan, which would take the demo down mid-assessment. Neon's free Postgres has no expiry, so the database lives there and Render runs only the two services.
 
@@ -14,19 +13,14 @@ Gets Pollux HR to a public URL in about fifteen minutes, on free tiers only. No 
 
 ## Before you start
 
-The two project folders must sit in **one** git repository, because the Render blueprint deploys both from it:
+Everything deploys from this repository: `render.yaml` at the root describes both
+services, and the two app folders sit beside it.
 
 ```
-Employee Management Platform/          <- git repo root, render.yaml lives here
+POLLUX-HR-MANGEMENT-SYSTEM-/        <- repository root, render.yaml lives here
 ├── Employee Management Platform BackEnd/
 └── Employee Management Platform FrontEnd/
 ```
-
-```bash
-cd "Employee Management Platform" && git init && git add . && git commit -m "Employee Management Platform"
-```
-
-Then push to a new GitHub repository.
 
 > **Note on the folder names.** They contain spaces, which `render.yaml` handles by quoting `rootDir`. If anything downstream misbehaves, renaming them to `backend/` and `frontend/` and updating the two `rootDir` values is the quickest fix.
 
@@ -46,7 +40,7 @@ Then push to a new GitHub repository.
 ## 2. Services on Render (5 min)
 
 1. Sign up at [render.com](https://render.com) and connect the GitHub repository.
-2. **New → Blueprint**, select the repo and the Pollux HR branch. Render reads `render.yaml` and proposes `pollux-hr-api` and `pollux-hr-web`.
+2. **New → Blueprint**, select `POLLUX-HR-MANGEMENT-SYSTEM-` (branch `main`). Render reads `render.yaml` and proposes `pollux-hr-api` and `pollux-hr-web`.
 3. Render will prompt for the values marked `sync: false`. Set on **pollux-hr-api**:
 
    | Variable | Value |
@@ -82,11 +76,11 @@ Redeploy both. `VITE_API_URL` is baked in at build time, so the frontend **must*
 ## 4. Load the demo data (5 min)
 
 The demo company is not created by the deploy. The seed runs TypeScript through the
-application's own services, so run it from a checkout of **this branch** (the production
+application's own services, so run it from a checkout of this repository (the production
 image ships only compiled code), pointed at the Neon database. Node 20+ is required.
 
 ```bash
-git clone -b claude/happy-babbage-yhcq6t https://github.com/taherfarg/matajer-employee-management-platform.git pollux-hr
+git clone https://github.com/taherfarg/POLLUX-HR-MANGEMENT-SYSTEM-.git pollux-hr
 cd "pollux-hr/Employee Management Platform BackEnd"
 npm ci && npx prisma generate
 

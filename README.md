@@ -134,8 +134,8 @@ preinstalled Chromium.
 
 React 19 + Vite · Express 4 + TypeScript · PostgreSQL + Prisma 6 · Zod · backend-issued
 JWT with rotating refresh tokens · pdfkit, exceljs · Vitest, Supertest, Playwright.
-No new framework was introduced: Pollux HR extends the Matajer People Hub codebase
-(still available, unchanged, on `main`).
+No new framework was introduced: Pollux HR was built by extending the
+[Matajer People Hub](https://github.com/taherfarg/matajer-employee-management-platform) codebase, and this repository keeps its full history.
 
 ## Documentation
 
