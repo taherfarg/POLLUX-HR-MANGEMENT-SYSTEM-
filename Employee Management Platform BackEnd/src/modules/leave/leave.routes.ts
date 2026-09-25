@@ -18,6 +18,14 @@ import {
   updateHolidaySchema,
   updateLeaveType,
 } from './leave.service';
+import {
+  adjustBalance,
+  balanceAdjustSchema,
+  balanceGenerateSchema,
+  balanceQuerySchema,
+  generateBalances,
+  listBalances,
+} from './leave-balances.service';
 
 export const leaveRouter: Router = Router();
 
@@ -117,5 +125,36 @@ leaveRouter.get(
         legalEntityId: query.legalEntityId,
       }),
     );
+  }),
+);
+
+// --- Leave balances -------------------------------------------------------------
+
+/** HR: everyone in scope. A manager: their team. An employee: their own. */
+leaveRouter.get(
+  '/balances',
+  asyncHandler(async (req: Request, res: Response) => {
+    const query = parseQuery(req, balanceQuerySchema);
+    const { items, meta, totals } = await listBalances(requireAuth(req), query);
+    res.json({ data: items, meta, totals });
+  }),
+);
+
+leaveRouter.post(
+  '/balances/generate',
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const input = parseBody(req, balanceGenerateSchema);
+    sendData(res, await generateBalances(requireAuth(req), input, auditContextFromRequest(req)));
+  }),
+);
+
+leaveRouter.patch(
+  '/balances/:id',
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = parseParams(req, idParamSchema);
+    const input = parseBody(req, balanceAdjustSchema);
+    sendData(res, await adjustBalance(requireAuth(req), id, input, auditContextFromRequest(req)));
   }),
 );

@@ -19,7 +19,7 @@ import {
 import { resolveLegalEntityId } from '../../services/company';
 import { diffRecords, recordAudit, type AuditInput } from '../../services/audit.service';
 import { notifyEmployee } from '../../services/notification.service';
-import { hashPassword } from '../auth/password';
+import { generateTemporaryPassword, hashPassword } from '../auth/password';
 import {
   employeeDetailInclude,
   employeeListInclude,
@@ -199,14 +199,6 @@ async function seedLeaveBalances(
     }),
     skipDuplicates: true,
   });
-}
-
-/** Generates a readable one-time password for a new account. */
-function generateTemporaryPassword(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-  const random = Array.from({ length: 10 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
-  // Guarantees the generated value satisfies the password policy.
-  return `Ems${random}7`;
 }
 
 /**

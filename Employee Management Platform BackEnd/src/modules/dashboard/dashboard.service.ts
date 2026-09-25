@@ -3,6 +3,8 @@ import type { AuthContext } from '../../common/auth-context';
 import { entityScopeWhere, isManagement, scopedEntityId } from '../../services/access';
 import { addDays, monthsBetween, startOfUtcDay } from '../../services/working-days';
 import { getLeaveBalances } from '../leave/leave.service';
+import { toAmount, type Money } from '../../services/money';
+import { getManagementPanels, getManagerPanels, getSelfPanels, monthlyCost } from './pollux-dashboard.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -299,11 +301,11 @@ export async function getManagementAlerts(auth: AuthContext): Promise<Record<str
 }
 
 /**
- * Payroll cost, grouped by currency and never summed across them.
+ * Salary cost, grouped by currency and never summed across them.
  *
- * A single "total payroll" number across AED, SAR and EGP would be meaningless
- * without an FX rate, and inventing one would be worse than omitting it. This is
- * a cost overview, not the payroll engine the brief puts out of scope.
+ * A single "total payroll" number across currencies would be meaningless
+ * without an FX rate, and inventing one would be worse than omitting it. All
+ * arithmetic is Decimal; numbers appear only in the response.
  */
 export async function getCompensationOverview(auth: AuthContext): Promise<Record<string, unknown>> {
   const scope = scopedEntityId(auth);
@@ -327,54 +329,45 @@ export async function getCompensationOverview(auth: AuthContext): Promise<Record
     },
   });
 
-  const byEntity = new Map<
-    string,
-    { legalEntityId: string; code: string; name: string; currency: string; employees: number; monthlyCost: number; salaries: number[] }
-  >();
-
+  const byEntity = new Map<string, { legalEntityId: string; code: string; name: string; currency: string; rows: typeof records }>();
   for (const record of records) {
-    const key = record.employee.legalEntityId;
-    const monthly =
-      (Number(record.baseSalary) +
-        Number(record.housingAllowance) +
-        Number(record.transportAllowance) +
-        Number(record.otherAllowances)) *
-      // Normalise everything to a monthly figure so entities are comparable.
-      (record.payFrequency === 'ANNUAL' ? 1 / 12 : record.payFrequency === 'BIWEEKLY' ? 26 / 12 : 1);
-
+    // Keyed by entity and currency: a salary recorded in another currency is
+    // its own line, never added to the entity's local-currency total.
+    const key = `${record.employee.legalEntityId}:${record.currency}`;
     const bucket = byEntity.get(key) ?? {
-      legalEntityId: key,
+      legalEntityId: record.employee.legalEntityId,
       code: record.employee.legalEntity.code,
       name: record.employee.legalEntity.name,
       currency: record.currency,
-      employees: 0,
-      monthlyCost: 0,
-      salaries: [],
+      rows: [],
     };
-    bucket.employees += 1;
-    bucket.monthlyCost += monthly;
-    bucket.salaries.push(Number(record.baseSalary));
+    bucket.rows.push(record);
     byEntity.set(key, bucket);
   }
 
-  const median = (values: number[]): number => {
-    if (values.length === 0) return 0;
-    const sorted = [...values].sort((a, b) => a - b);
+  const median = (values: Money[]): Money | null => {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a.comparedTo(b));
     const middle = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 ? ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2 : (sorted[middle] as number);
+    return sorted.length % 2 === 0
+      ? (sorted[middle - 1] as Money).plus(sorted[middle] as Money).dividedBy(2)
+      : (sorted[middle] as Money);
   };
 
   return {
-    byLegalEntity: [...byEntity.values()].map((bucket) => ({
-      legalEntityId: bucket.legalEntityId,
-      code: bucket.code,
-      name: bucket.name,
-      currency: bucket.currency,
-      employeesWithSalary: bucket.employees,
-      monthlyCost: Number(bucket.monthlyCost.toFixed(2)),
-      annualCost: Number((bucket.monthlyCost * 12).toFixed(2)),
-      medianBaseSalary: Number(median(bucket.salaries).toFixed(2)),
-    })),
+    byLegalEntity: [...byEntity.values()].map((bucket) => {
+      const monthly = monthlyCost(bucket.rows);
+      return {
+        legalEntityId: bucket.legalEntityId,
+        code: bucket.code,
+        name: bucket.name,
+        currency: bucket.currency,
+        employeesWithSalary: bucket.rows.length,
+        monthlyCost: toAmount(monthly),
+        annualCost: toAmount(monthly.times(12)),
+        medianBaseSalary: toAmount(median(bucket.rows.map((row) => row.baseSalary))) ?? 0,
+      };
+    }),
     note: 'Figures are grouped by currency and are not converted or summed across currencies.',
   };
 }
@@ -469,11 +462,31 @@ export async function getEmployeeDashboard(auth: AuthContext): Promise<Record<st
   };
 }
 
-/** Routes the caller to the dashboard that matches their role. */
+/**
+ * Routes the caller to the dashboard that matches their role.
+ *
+ *  MANAGEMENT  HR and administrators: company cards, today's attendance,
+ *              approvals, alerts, recent activity and payroll.
+ *  MANAGER     their own panels plus their team's attendance and approvals -
+ *              never pay figures for anyone but themselves.
+ *  EMPLOYEE    their own attendance, leave, requests, payslip and advance.
+ */
 export async function getDashboard(auth: AuthContext): Promise<Record<string, unknown>> {
+  const now = new Date();
   if (isManagement(auth)) {
-    const [overview, alerts] = await Promise.all([getAdminDashboard(auth), getManagementAlerts(auth)]);
-    return { view: 'MANAGEMENT', ...overview, alerts };
+    const [overview, alerts, panels, self] = await Promise.all([
+      getAdminDashboard(auth),
+      getManagementAlerts(auth),
+      getManagementPanels(auth, now),
+      getSelfPanels(auth, now),
+    ]);
+    return { view: 'MANAGEMENT', ...overview, alerts, ...panels, self };
   }
-  return { view: 'EMPLOYEE', ...(await getEmployeeDashboard(auth)) };
+
+  const [personal, self, team] = await Promise.all([
+    getEmployeeDashboard(auth),
+    getSelfPanels(auth, now),
+    auth.role === 'MANAGER' ? getManagerPanels(auth, now) : Promise.resolve(null),
+  ]);
+  return { view: auth.role === 'MANAGER' ? 'MANAGER' : 'EMPLOYEE', ...personal, ...self, team };
 }

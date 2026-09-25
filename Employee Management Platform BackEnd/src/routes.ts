@@ -14,8 +14,10 @@ import { meRouter } from './modules/me/me.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { overtimeRouter } from './modules/overtime/overtime.routes';
 import { payrollRouter, payslipsRouter } from './modules/payroll/payroll.routes';
+import { reportsRouter } from './modules/reports/reports.routes';
 import { requestsRouter } from './modules/requests/requests.routes';
 import { publicRouter, settingsRouter } from './modules/settings/settings.routes';
+import { usersRouter } from './modules/users/users.routes';
 import { workLocationsRouter } from './modules/work-locations/work-locations.routes';
 import { workSchedulesRouter } from './modules/work-schedules/work-schedules.routes';
 
@@ -46,6 +48,8 @@ apiRouter.get('/', (_req, res) => {
         requests: '/api/v1/requests',
         leave: '/api/v1/leave',
         documents: '/api/v1/documents',
+        reports: '/api/v1/reports',
+        users: '/api/v1/users',
         dashboard: '/api/v1/dashboard',
         notifications: '/api/v1/notifications',
         settings: '/api/v1/settings',
@@ -73,6 +77,8 @@ apiRouter.use('/payslips', payslipsRouter);
 apiRouter.use('/requests', requestsRouter);
 apiRouter.use('/leave', leaveRouter);
 apiRouter.use('/documents', documentsRouter);
+apiRouter.use('/reports', reportsRouter);
+apiRouter.use('/users', usersRouter);
 apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/settings', settingsRouter);

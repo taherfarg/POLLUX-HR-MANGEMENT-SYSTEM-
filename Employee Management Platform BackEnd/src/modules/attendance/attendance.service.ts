@@ -276,9 +276,9 @@ const subjectSelect = {
   workLocation: { select: { id: true, name: true } },
 } as const;
 
-type SubjectRow = Prisma.EmployeeGetPayload<{ select: typeof subjectSelect }>;
+export type SubjectRow = Prisma.EmployeeGetPayload<{ select: typeof subjectSelect }>;
 
-function labelOf(subject: SubjectRow): EmployeeLabel {
+export function labelOf(subject: SubjectRow): EmployeeLabel {
   return {
     id: subject.id,
     employeeNumber: subject.employeeNumber,
@@ -295,7 +295,7 @@ function labelOf(subject: SubjectRow): EmployeeLabel {
  * in the range: everyone in scope for HR, self plus direct reports for anyone
  * else. Filters narrow that set; they can never widen it.
  */
-async function resolveSubjects(
+export async function resolveSubjects(
   auth: AuthContext,
   filters: { employeeId?: string; departmentId?: string; workLocationId?: string; workMode?: string; q?: string; teamOnly?: boolean },
   fromKey: string,
