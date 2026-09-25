@@ -82,7 +82,8 @@ each judged against their own schedule, timezone and holiday calendar.
 ## Demo accounts
 
 Password for every account: **`Passw0rd!23`** (the seed's `SEED_DEMO_PASSWORD` default —
-demo data only). The login page has one-click fillers.
+demo data only). In development the login page has one-click fillers; a production build
+shows them only when built with `VITE_DEMO_ACCOUNTS=true`.
 
 | Role | Email | Who |
 |---|---|---|
@@ -109,6 +110,14 @@ cd "Employee Management Platform FrontEnd" && npm install && npm run dev
 Open <http://localhost:5173>. The API is on `http://localhost:4000` (health at `/health`);
 Vite proxies `/api`, so the frontend needs no environment variable locally.
 
+### For real use
+
+`npm run db:setup` is the seed's counterpart for a real start: it clears the database and
+creates POLLUX MOTORS FZE with its working configuration (Dubai Office, a Monday-to-Friday
+schedule, UAE holidays, leave types) and only the accounts you pass in environment
+variables, so real emails and passwords never enter the repository. See
+[DEPLOYMENT.md, step 4a](DEPLOYMENT.md#4a-your-company-dbsetup).
+
 ### Tests
 
 ```bash
@@ -125,8 +134,8 @@ preinstalled Chromium.
 
 | Suite | Result |
 |---|---|
-| Backend integration — Vitest + Supertest against PostgreSQL | **281 / 281** |
-| Frontend unit — client, adapters, formatting, navigation, audit diff | **52 / 52** |
+| Backend integration — Vitest + Supertest against PostgreSQL | **292 / 292** |
+| Frontend unit — client, adapters, formatting, navigation, audit diff, demo logins | **54 / 54** |
 | E2E — Playwright, real stack, 1440×900 and 390×844 | **23 / 23** |
 | Typecheck · backend build · frontend build · migrations from empty + seed | clean |
 

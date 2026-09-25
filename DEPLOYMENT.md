@@ -5,7 +5,7 @@ Gets Pollux HR to a public URL in about fifteen minutes, on free tiers only. No 
 > **Next to the Matajer demo.** This blueprint creates its own services, `pollux-hr-api`
 > and `pollux-hr-web`, so it can share a Render account with the Matajer demo
 > (`ems-api` / `ems-web`) without touching it. Give Pollux **its own database** — the
-> seed replaces all demo data in the database it runs against.
+> seed and the setup in step 4 replace everything in the database they run against.
 
 **Why this split:** Render's own Postgres expires after 30 days on the free plan, which would take the demo down mid-assessment. Neon's free Postgres has no expiry, so the database lives there and Render runs only the two services.
 
@@ -50,7 +50,7 @@ POLLUX-HR-MANGEMENT-SYSTEM-/        <- repository root, render.yaml lives here
    | Variable | Value |
    |---|---|
    | `DATABASE_URL` | the Neon direct connection string from step 1 |
-   | `SEED_DEMO_PASSWORD` | `Passw0rd!23` (or your own — it becomes every demo account's password) |
+   | `SEED_DEMO_PASSWORD` | `Passw0rd!23`. The API does not use it; it is kept for the demo seed. Any 8+ characters will do |
    | `CORS_ORIGINS` | leave blank for now, filled in step 3 |
    | `GOOGLE_API_KEY` | optional; leave blank to use letter templates. Key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
 
@@ -77,17 +77,92 @@ Redeploy both. `VITE_API_URL` is baked in at build time, so the frontend **must*
 
 ---
 
-## 4. Load the demo data (5 min)
+## 4. Load the data (5 min)
 
-The demo company is not created by the deploy. The seed runs TypeScript through the
-application's own services, so run it from a checkout of this repository (the production
-image ships only compiled code), pointed at the Neon database. Node 20+ is required.
+The deploy creates the tables but no company and no logins. Choose one:
+
+- **4a. Your company, for real use:** POLLUX MOTORS FZE with only the people you name
+  (`npm run db:setup`).
+- **4b. The demo:** a fictional POLLUX MOTORS FZE with 14 employees, two months of
+  attendance and payroll (`npm run db:seed`).
+
+Both run TypeScript from a checkout of this repository (the production image ships only
+compiled code), pointed at the Neon database. Node 20+ is required. Each **replaces
+everything** in the database it runs against. Get the code once:
 
 ```bash
 git clone https://github.com/taherfarg/POLLUX-HR-MANGEMENT-SYSTEM-.git pollux-hr
 cd "pollux-hr/Employee Management Platform BackEnd"
 npm ci && npx prisma generate
+```
 
+`npx prisma migrate deploy` in the steps below makes the order irrelevant: it creates the
+tables if the API has not started yet, and does nothing if it already has. Use the same
+direct connection string as the API.
+
+### 4a. Your company: `db:setup`
+
+Creates POLLUX MOTORS FZE in Dubai (AED, Monday to Friday), one work location and one
+schedule (Dubai Office, 09:00-18:00), the UAE's fixed-date public holidays, the standard
+leave types with this year's balances, and one employee record and login per account.
+No demo people, attendance, leave, advances or payroll.
+
+The accounts are passed as environment variables, so real emails and passwords never
+enter the repository. Each variable takes one or more entries separated by `;`:
+
+```
+Full name|email|password|Job title|Hire date (YYYY-MM-DD)
+```
+
+The job title and hire date are optional. Passwords follow the app's policy: 10+
+characters with an uppercase letter, a lowercase letter and a digit.
+
+| Variable | Role |
+|---|---|
+| `SETUP_ADMINS` | Administrator: everything, including company settings. At least one is required |
+| `SETUP_HR` | HR: people, attendance, leave and payroll, not company settings |
+| `SETUP_MANAGERS` | Manager: their team's attendance and leave, never pay |
+| `SETUP_EMPLOYEES` | Employee: their own record. Employees report to the first manager |
+
+Windows PowerShell (single quotes keep every character as typed):
+
+```powershell
+$env:DATABASE_URL='<the Neon connection string>'
+$env:SETUP_ADMINS='Full Name|admin@example.com|ChangeMe2026|HR Manager'
+$env:SETUP_MANAGERS='Full Name|manager@example.com|ChangeMe2026|Sales Manager'
+$env:SETUP_EMPLOYEES='Full Name|one@example.com|ChangeMe2026;Full Name|two@example.com|ChangeMe2026'
+npx prisma migrate deploy
+npm run db:setup
+```
+
+macOS / Linux: the same with `export NAME='...'`.
+
+The output lists each login and what to finish in the app as an administrator:
+
+- **Settings → Company:** the trade licence / registration number (printed on payslips
+  and letters) and the address.
+- **Each person's file:** the hire date and the salary, before the first payroll. Payroll
+  pays from the hire date; without one, setup records the person as an existing employee
+  as of the setup day.
+- **Holidays:** the Islamic holidays each year, once they are announced.
+
+Also good to know:
+
+- Attendance is tracked from the day after setup, so the day it runs never counts as an
+  absence. Change the date in **Settings → Attendance**.
+- With a single HR or administrator account, nobody else could approve a payroll, so the
+  separate-approver rule starts **off**. Turn it on in **Settings → Payroll** once two
+  people can approve.
+- Nobody approves their own request. Until a second HR account exists, the only HR person's
+  own leave needs their direct manager: set one in their file.
+- Setup refuses to run over a database that already holds real (non-`.demo`) people. To
+  really start over, add `SETUP_ALLOW_WIPE=yes`. It runs as one transaction, so a failure
+  leaves the database as it was.
+- Close the terminal afterwards: the variables hold the passwords.
+
+### 4b. The demo: `db:seed`
+
+```bash
 export DATABASE_URL="<the Neon connection string>"
 export JWT_ACCESS_SECRET="seed-only-placeholder-access-0123456789abcdef"
 export JWT_REFRESH_SECRET="seed-only-placeholder-refresh-0123456789abcdef"
@@ -99,16 +174,17 @@ On Windows PowerShell, replace the four `export` lines with
 `$env:DATABASE_URL="..."`, `$env:JWT_ACCESS_SECRET="..."`, `$env:JWT_REFRESH_SECRET="..."`
 and `$env:SEED_DEMO_PASSWORD="..."`, then run the last line as two commands.
 
-- `migrate deploy` makes the order irrelevant: it creates the tables if the API has not
-  started yet, and does nothing if it already has.
 - The JWT values only satisfy the environment check - the seed issues no tokens - so they
   need not match the API's.
 - The seed makes a few thousand queries; from a laptop far from the database it can take
-  several minutes. Use the same direct connection string as the API.
+  several minutes.
 - Expected output: POLLUX MOTORS FZE with 7 departments, 4 work locations, 14 employees
   and 7 logins, the previous month's payroll paid and the current month's calculated.
+- For the one-click demo logins on the sign-in page, set `VITE_DEMO_ACCOUNTS` to `true`
+  on **pollux-hr-web** → Environment, then **Manual Deploy → Clear build cache & deploy**.
+  Production builds leave them out otherwise.
 
-Run this **once**. It clears and rebuilds the demo data every time, so re-running it
+Run the seed **once**. It clears and rebuilds the demo data every time, so re-running it
 discards anything created during evaluation.
 
 ---
@@ -121,7 +197,8 @@ curl https://pollux-hr-api.onrender.com/health
 
 Expect `{"status":"ok",...,"database":"connected"}`.
 
-Then open the frontend URL and sign in:
+Then open the frontend URL and sign in: with an account you passed to `db:setup`, or
+with the demo accounts:
 
 | Role | Email | Password |
 |---|---|---|
@@ -157,4 +234,6 @@ Option 2 is what I would do: free, and the evaluator never sees a cold start.
 | Login returns 500 | Schema missing — migrations did not run | Check the deploy log for `prisma migrate deploy`; step 4 also runs it from your checkout |
 | Deploy log shows `prepared statement "s0" already exists` or an advisory-lock timeout | `DATABASE_URL` is Neon's pooled string | Use the direct string (Connection pooling off) |
 | Prisma says the database string is invalid | An extra parameter in the copied string | Keep `?sslmode=require`; remove anything else, such as `&channel_binding=require` |
-| Directory empty after login | Seed never ran | Run the seed as in step 4 |
+| Login fails with a valid-looking password right after deploy | No data loaded yet | Run step 4a (your company) or 4b (the demo) |
+| `db:setup` says the database already holds real data | It was set up before | Add `SETUP_ALLOW_WIPE=yes` only if you really mean to delete everything and start over |
+| Demo account buttons missing on the sign-in page | Production builds leave them out | Set `VITE_DEMO_ACCOUNTS=true` on pollux-hr-web and redeploy (demo only) |

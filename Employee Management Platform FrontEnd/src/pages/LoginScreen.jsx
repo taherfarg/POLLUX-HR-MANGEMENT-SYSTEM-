@@ -3,7 +3,9 @@ import { CalendarCheck2, Clock, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Wal
 import { BrandMark, Spinner } from '../components/ui.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { fetchBranding } from '../api/endpoints.js'
-import { DEMO_ACCOUNTS, DEMO_PASSWORD } from '../data.js'
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, demoAccountsEnabled } from '../data.js'
+
+const SHOW_DEMO_ACCOUNTS = demoAccountsEnabled()
 
 export default function LoginScreen() {
   const { signIn } = useAuth()
@@ -98,7 +100,7 @@ export default function LoginScreen() {
                   autoComplete="username"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@pollux.demo"
+                  placeholder={SHOW_DEMO_ACCOUNTS ? 'name@pollux.demo' : 'name@company.com'}
                   aria-label="Work email"
                   required
                 />
@@ -136,15 +138,19 @@ export default function LoginScreen() {
             </button>
           </form>
 
-          <div className="demo-divider">Demo accounts</div>
-          <div className="demo-accounts">
-            {DEMO_ACCOUNTS.map((account) => (
-              <button type="button" key={account.email} onClick={() => fillAccount(account)}>
-                <strong>{account.label}</strong>
-                <small>{account.description}</small>
-              </button>
-            ))}
-          </div>
+          {SHOW_DEMO_ACCOUNTS && (
+            <>
+              <div className="demo-divider">Demo accounts</div>
+              <div className="demo-accounts">
+                {DEMO_ACCOUNTS.map((account) => (
+                  <button type="button" key={account.email} onClick={() => fillAccount(account)}>
+                    <strong>{account.label}</strong>
+                    <small>{account.description}</small>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <p className="security-note">
             <ShieldCheck size={14} /> Every access rule is enforced by the server.
           </p>

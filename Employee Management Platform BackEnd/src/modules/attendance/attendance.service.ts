@@ -245,6 +245,10 @@ export async function getMyToday(auth: AuthContext, now: Date = new Date()): Pro
   const canCheckOut = Boolean(
     (record?.checkIn && !record.checkOut) || (open?.checkIn && minutesBetween(open.checkIn, now) <= MAX_SHIFT_MINUTES),
   );
+  // Before the company starts tracking, check-ins are recorded but a missing
+  // one is not held against anyone - "not tracked yet", not "not tracked for you".
+  const start = context.settings.attendanceStartDate ? toDateKey(context.settings.attendanceStartDate) : null;
+  const trackingStartsOn = context.attendanceTracked && start && todayKey < start ? start : null;
 
   return {
     serverTime: now,
@@ -254,6 +258,7 @@ export async function getMyToday(auth: AuthContext, now: Date = new Date()): Pro
     schedule: { id: context.schedule.id, name: context.schedule.name, timezone: context.schedule.timezone },
     today: today ? serializeDay(today, { includeCorrection: true }) : null,
     openFromEarlierDay: open ? { id: open.id, date: toDateKey(open.workDate), checkInLocal: zonedClock(open.checkIn, open.timezone) } : null,
+    trackingStartsOn,
     canCheckIn: !record && !onLeave && !canCheckOut,
     canCheckOut,
   };

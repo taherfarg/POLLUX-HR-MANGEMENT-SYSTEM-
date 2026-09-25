@@ -57,6 +57,7 @@ curl -X POST http://localhost:4000/api/v1/auth/login -H "Content-Type: applicati
 | `npm run db:up` / `db:down` | Start / stop the Postgres containers |
 | `npm run db:migrate` | Create and apply a migration after a schema change |
 | `npm run db:seed` | Load the Pollux demo data (replaces existing demo data) |
+| `npm run db:setup` | Clean start for real use: the company's configuration and only the accounts in `SETUP_ADMINS`, `SETUP_HR`, `SETUP_MANAGERS`, `SETUP_EMPLOYEES` (see [`prisma/setup.ts`](prisma/setup.ts) and [DEPLOYMENT.md, step 4a](../DEPLOYMENT.md#4a-your-company-dbsetup)) |
 | `npm run db:reset` | Drop, re-migrate and re-seed the **development** database |
 | `npm run db:studio` | Prisma Studio, a browser UI over the data |
 
@@ -338,6 +339,19 @@ The brief's examples are reproduced exactly: Ahmed's annual leave 30 + 2 − 10 
 his August payslip gross 6,550.00, deductions 666.67, net 5,883.33; an advance of 3,000
 over 6 × 500. All names and figures are invented and the `.demo` domain does not resolve.
 
+### Real use: `db:setup`
+
+`npm run db:setup` ([`prisma/setup.ts`](prisma/setup.ts)) clears the database and creates
+POLLUX MOTORS FZE with one work location, one Monday-to-Friday schedule, the UAE's
+fixed-date holidays, the leave types above with this year's balances, and an employee and
+login for each account in `SETUP_ADMINS`, `SETUP_HR`, `SETUP_MANAGERS` and
+`SETUP_EMPLOYEES` (entries `Full name|email|password|Job title|YYYY-MM-DD`, separated by
+`;`). The accounts come from the environment so real credentials never enter the
+repository. It needs only `DATABASE_URL`, no JWT secrets. It runs as one transaction and
+refuses to replace real (non-`.demo`) people unless `SETUP_ALLOW_WIPE=yes`. With a single
+HR/administrator account it turns the separate payroll approver off, and attendance is
+tracked from the day after setup. Walkthrough: [DEPLOYMENT.md, step 4a](../DEPLOYMENT.md#4a-your-company-dbsetup).
+
 ---
 
 ## Testing
@@ -346,7 +360,7 @@ over 6 × 500. All names and figures are invented and the `.demo` domain does no
 TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?schema=public npm test
 ```
 
-**281 tests across 14 files**, against a real PostgreSQL test database:
+**292 tests across 15 files**, against a real PostgreSQL test database:
 
 | File | Covers |
 |---|---|
@@ -361,6 +375,7 @@ TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?sc
 | `payroll-engine.test.ts` | The pure payroll calculation |
 | `payroll.test.ts` | Advances, adjustments, the payroll lifecycle, four-eyes, locking, payslips |
 | `administration.test.ts` | Users & roles, leave balances, reports, document library, dashboards per role |
+| `clean-start.test.ts` | `db:setup`: reading the accounts, the result, sign-in, single-approver payroll, the wipe guard |
 | `report-export.test.ts` | CSV/Excel/PDF writers, formula-injection neutralising |
 | `working-days.test.ts` | Leave day counting |
 
@@ -372,9 +387,9 @@ The only coupling to a database host is `DATABASE_URL`. The included `Dockerfile
 multi-stage build that runs as a non-root user and applies pending migrations
 (`prisma migrate deploy`) before accepting traffic; all Pollux migrations are additive
 and backfill existing data. A Render blueprint is in [`../render.yaml`](../render.yaml)
-with a walkthrough in [`../DEPLOYMENT.md`](../DEPLOYMENT.md). Load the demo data once by
-running `npm run db:seed` from a checkout against the hosted database (the production
-image ships compiled code only). Generate real JWT secrets with
+with a walkthrough in [`../DEPLOYMENT.md`](../DEPLOYMENT.md). Load the data once from a
+checkout against the hosted database (the production image ships compiled code only):
+`npm run db:setup` for real use, or `npm run db:seed` for the demo. Generate real JWT secrets with
 `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
 
 ---
@@ -389,3 +404,4 @@ image ships compiled code only). Generate real JWT secrets with
 - **Rate limiting is in-process**; several instances would need a shared store.
 - **No refresh-token cleanup job**; expired rows are harmless and indexed.
 - `npm run db:reset` and `npm run db:seed` replace data — development databases only.
+  `npm run db:setup` replaces data too, but refuses to replace real people unless told to.

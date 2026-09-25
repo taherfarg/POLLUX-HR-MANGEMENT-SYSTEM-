@@ -26,8 +26,11 @@ Code: [`attendance.engine.ts`](../Employee%20Management%20Platform%20BackEnd/src
    directly: late by 17 minutes, 45 minutes of overtime, a Cairo check-in against a Cairo
    schedule across a DST change.
 4. **Nothing is inferred before go-live.** `attendanceStartDate` (Company settings) is
-   the first tracked day; earlier days are never marked absent. People whose attendance is
-   not tracked (`attendanceTracked = false`, e.g. the General Manager) are never absent.
+   the first tracked day; earlier days are never marked absent. Check-ins before it are
+   still recorded, and the check-in card says when tracking starts (`trackingStartsOn` on
+   `GET /attendance/today`). `npm run db:setup` sets it to the day after setup. People
+   whose attendance is not tracked (`attendanceTracked = false`, e.g. the General
+   Manager) are never absent.
 5. **Policy is data.** Grace minutes, the partial-day threshold, the missing check-out
    margin and every overtime rule live in `CompanySettings`, edited by an administrator
    and audited — nothing is hard-coded.

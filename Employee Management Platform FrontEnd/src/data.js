@@ -7,6 +7,16 @@
  * (SEED_DEMO_PASSWORD) and never a production secret.
  */
 
+/**
+ * The one-click demo logins appear in development, where the demo is seeded,
+ * and in a production build only when it is made with VITE_DEMO_ACCOUNTS=true.
+ * A deployment set up with real accounts (`npm run db:setup`) must not offer
+ * logins that do not exist.
+ */
+export function demoAccountsEnabled(env = import.meta.env) {
+  return Boolean(env.DEV) || env.VITE_DEMO_ACCOUNTS === 'true'
+}
+
 export const DEMO_PASSWORD = 'Passw0rd!23'
 
 export const DEMO_ACCOUNTS = [

@@ -55,6 +55,8 @@ describe('attendance API', () => {
       expect(today.body.data.canCheckIn).toBe(false);
       expect(today.body.data.canCheckOut).toBe(true);
       expect(today.body.data.timezone).toBe('Asia/Dubai');
+      // Tracked from the hire date, not waiting for a company start date.
+      expect(today.body.data.trackingStartsOn).toBeNull();
     });
 
     it('checks out once, and only once', async () => {

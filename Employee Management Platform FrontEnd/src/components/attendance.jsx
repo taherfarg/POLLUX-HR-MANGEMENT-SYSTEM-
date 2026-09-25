@@ -60,7 +60,9 @@ export function ClockButton({ onToast }) {
   const data = today.data
   if (!data) return null
   const status = data.today?.status
-  if (status === 'NOT_TRACKED') return null
+  // Hidden for people who never check in; shown before tracking starts, when
+  // check-ins are already recorded.
+  if (status === 'NOT_TRACKED' && !data.trackingStartsOn) return null
 
   if (data.canCheckOut) {
     return (
@@ -99,7 +101,9 @@ export function CheckInCard({ onToast }) {
   const dayLabel = day?.dayType === 'WEEKEND' ? 'Rest day' : day?.dayType === 'HOLIDAY' ? (day.holidayName ?? 'Public holiday') : null
   const withDay = (text) => (dayLabel ? `${text} · ${dayLabel}` : text)
   let headline = 'Not checked in yet'
-  if (day?.status === 'NOT_TRACKED') headline = 'Attendance is not tracked for you'
+  if (day?.status === 'NOT_TRACKED') {
+    headline = data.trackingStartsOn ? `Attendance tracking starts ${formatDay(data.trackingStartsOn)}` : 'Attendance is not tracked for you'
+  }
   else if (day?.checkIn && !day.checkOut) headline = withDay(`Checked in at ${day.checkInLocal}`)
   else if (day?.checkOut) headline = withDay(`Done for today at ${day.checkOutLocal}`)
   else if (dayLabel) headline = dayLabel

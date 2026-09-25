@@ -7,7 +7,9 @@ frontend only hides what the API would refuse anyway.
 ## Demo accounts
 
 All seeded accounts use `Passw0rd!23` (the seed's `SEED_DEMO_PASSWORD` default — demo
-only). The login page has one-click fillers for the first four.
+only). In development the login page has one-click fillers for the first four. A
+production build leaves them out, because a deployment set up with real accounts
+(`npm run db:setup`) has no demo logins, unless it is built with `VITE_DEMO_ACCOUNTS=true`.
 
 | Role | Email |
 |---|---|
@@ -33,6 +35,7 @@ environment variable is needed locally. `npm run build` produces `dist/`.
 |---|---|
 | `VITE_API_URL` | Absolute API base (including `/api/v1`) for a split deployment; add the frontend origin to the backend's `CORS_ORIGINS` |
 | `VITE_PROXY_TARGET` | Where the dev proxy forwards `/api` (default `http://localhost:4000`) |
+| `VITE_DEMO_ACCOUNTS` | `true` shows the one-click demo logins in a production build (always shown in development) |
 
 ## What each role sees
 
@@ -80,7 +83,7 @@ src/
 ## Tests
 
 ```bash
-npm test        # 52 unit tests: API client, adapters, formatting, role navigation, audit diff
+npm test        # 54 unit tests: API client, adapters, formatting, role navigation, audit diff, demo logins
 npm run build
 ```
 

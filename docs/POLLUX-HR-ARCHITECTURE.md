@@ -180,6 +180,8 @@ grace minutes, overtime rates, payroll proration, advance limits, default schedu
 calendar — is **company settings in the database**, edited on the Company settings page.
 
 Frontend: `VITE_API_URL` for a split deployment; in development Vite proxies `/api`.
+`VITE_DEMO_ACCOUNTS=true` keeps the one-click demo logins in a production build, which
+otherwise leaves them out.
 
 ## 6. Demo data (`prisma/seed.ts`)
 
@@ -194,6 +196,12 @@ from `SEED_DEMO_PASSWORD` (default `Passw0rd!23` — a demo value, never a produ
 secret). The brief's worked examples come out exactly: Ahmed's annual leave
 30 + 2 − 10 − 3 = **19 available**; his August payslip gross **6,550.00**, deductions
 **666.67**, net **5,883.33**; advance **3,000 over 6 × 500**.
+
+For real use, `prisma/setup.ts` (`npm run db:setup`) is the counterpart: the same
+company with one work location, one schedule, the UAE's fixed-date holidays and the leave
+types, and only the accounts named in `SETUP_ADMINS`, `SETUP_HR`, `SETUP_MANAGERS` and
+`SETUP_EMPLOYEES`. Credentials come from the environment, never from the repository. It
+runs as one transaction and will not replace real people unless `SETUP_ALLOW_WIPE=yes`.
 
 ## 7. Testing
 
