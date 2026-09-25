@@ -93,8 +93,11 @@ everything** in the database it runs against. Get the code once:
 ```bash
 git clone https://github.com/taherfarg/POLLUX-HR-MANGEMENT-SYSTEM-.git pollux-hr
 cd "pollux-hr/Employee Management Platform BackEnd"
-npm ci && npx prisma generate
+npm ci
+npx prisma generate
 ```
+
+With a copy from before, run `git pull` in that folder instead of cloning, then `npm ci`.
 
 `npx prisma migrate deploy` in the steps below makes the order irrelevant: it creates the
 tables if the API has not started yet, and does nothing if it already has. Use the same
