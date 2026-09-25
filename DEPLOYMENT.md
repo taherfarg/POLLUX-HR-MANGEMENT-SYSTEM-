@@ -79,26 +79,37 @@ Redeploy both. `VITE_API_URL` is baked in at build time, so the frontend **must*
 
 ---
 
-## 4. Load the demo data (2 min)
+## 4. Load the demo data (5 min)
 
-The schema is created by the migration, but the demo company is not. The seed runs
-TypeScript through the application's own services, so run it from a checkout of this
-repository (the production image ships only compiled code), pointed at the hosted
-database:
+The demo company is not created by the deploy. The seed runs TypeScript through the
+application's own services, so run it from a checkout of **this branch** (the production
+image ships only compiled code), pointed at the Neon database. Node 20+ is required.
 
 ```bash
-cd "Employee Management Platform BackEnd" && npm ci
-DATABASE_URL="<the Neon connection string>" \
-JWT_ACCESS_SECRET="seed-only-placeholder-access-0123456789abcdef" \
-JWT_REFRESH_SECRET="seed-only-placeholder-refresh-0123456789abcdef" \
-SEED_DEMO_PASSWORD="<the demo password you want>" \
-npm run db:seed
+git clone -b claude/happy-babbage-yhcq6t https://github.com/taherfarg/matajer-employee-management-platform.git pollux-hr
+cd "pollux-hr/Employee Management Platform BackEnd"
+npm ci && npx prisma generate
+
+export DATABASE_URL="<the Neon connection string>"
+export JWT_ACCESS_SECRET="seed-only-placeholder-access-0123456789abcdef"
+export JWT_REFRESH_SECRET="seed-only-placeholder-refresh-0123456789abcdef"
+export SEED_DEMO_PASSWORD="<the demo password you want>"
+npx prisma migrate deploy && npm run db:seed
 ```
 
-The JWT values only satisfy the environment check - the seed issues no tokens - so they
-need not match the API's. Expected output: POLLUX MOTORS FZE with 7 departments,
-4 work locations, 14 employees and 7 logins, the previous month's payroll paid and the
-current month's calculated.
+On Windows PowerShell, replace the four `export` lines with
+`$env:DATABASE_URL="..."`, `$env:JWT_ACCESS_SECRET="..."`, `$env:JWT_REFRESH_SECRET="..."`
+and `$env:SEED_DEMO_PASSWORD="..."`, then run the last line as two commands.
+
+- `migrate deploy` makes the order irrelevant: it creates the tables if the API has not
+  started yet, and does nothing if it already has.
+- The JWT values only satisfy the environment check - the seed issues no tokens - so they
+  need not match the API's.
+- The seed makes a few thousand queries; from a laptop far from the database it can take
+  several minutes. If the pooled connection string gives errors, use the direct
+  (non-pooled) one for this step.
+- Expected output: POLLUX MOTORS FZE with 7 departments, 4 work locations, 14 employees
+  and 7 logins, the previous month's payroll paid and the current month's calculated.
 
 Run this **once**. It clears and rebuilds the demo data every time, so re-running it
 discards anything created during evaluation.
