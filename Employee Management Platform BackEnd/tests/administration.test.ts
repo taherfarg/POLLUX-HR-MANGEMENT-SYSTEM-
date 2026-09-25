@@ -10,10 +10,12 @@ import { passwordSchema } from '../src/modules/auth/password';
  * part of it.
  */
 
-const binary = (res: NodeJS.ReadableStream, callback: (error: Error | null, body: Buffer) => void) => {
+// Superagent types the response as its own Response; at runtime it is the Node stream.
+const binary = (res: unknown, callback: (error: Error | null, body: Buffer) => void) => {
+  const stream = res as NodeJS.ReadableStream;
   const chunks: Buffer[] = [];
-  res.on('data', (chunk: Buffer) => chunks.push(chunk));
-  res.on('end', () => callback(null, Buffer.concat(chunks)));
+  stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+  stream.on('end', () => callback(null, Buffer.concat(chunks)));
 };
 
 function download(token: string, url: string) {

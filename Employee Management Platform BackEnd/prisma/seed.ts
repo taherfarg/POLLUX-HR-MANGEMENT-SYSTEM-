@@ -47,7 +47,7 @@ import {
 } from '../src/modules/payroll/payroll.service';
 import { calculateLeaveDays } from '../src/modules/leave/leave.service';
 import { loadWorkContexts, type EmployeeWorkContext } from '../src/services/work-context';
-import { addDaysToKey, dayOfWeekForDateKey, zonedDateKey, zonedWallTimeToUtc } from '../src/services/timezone';
+import { addDaysToKey, zonedDateKey, zonedWallTimeToUtc } from '../src/services/timezone';
 
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Passw0rd!23';
 const COMPANY_TZ = 'Asia/Dubai';
@@ -944,6 +944,9 @@ async function main(): Promise<void> {
         if (key === localToday) script.inOffset = 22; // late today
       }
       if (person.number === 'PLX-0008' && (key === omarAbsent || key === localToday)) script.absent = true;
+      // Amine has not checked in yet today, whatever the hour the seed runs -
+      // the acceptance suite checks him in and out from the browser.
+      if (person.number === 'PLX-0013' && key === localToday) script.absent = true;
       if (person.number === 'PLX-0006' && key === lastWorkingDay) script.open = true; // forgot to check out
 
       const record = await writeDay(context, dayInputs, key, script);

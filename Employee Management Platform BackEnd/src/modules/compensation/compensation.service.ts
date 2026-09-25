@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
+import { toAmount } from '../../services/money';
 import { prisma } from '../../db/prisma';
 import { dateStringSchema, optionalTrimmedString, requiredTrimmedString, toUtcDate } from '../../common/validate';
 import { NotFoundError, ValidationError } from '../../common/errors';
@@ -41,15 +42,17 @@ function serializeRecord(record: {
   isCurrent: boolean;
   createdAt: Date;
 }) {
-  const base = Number(record.baseSalary);
-  const allowances =
-    Number(record.housingAllowance) + Number(record.transportAllowance) + Number(record.otherAllowances);
+  // Decimal arithmetic; numbers only at the JSON edge.
+  const totalFixed = record.baseSalary
+    .plus(record.housingAllowance)
+    .plus(record.transportAllowance)
+    .plus(record.otherAllowances);
 
   return {
     id: record.id,
     effectiveFrom: record.effectiveFrom.toISOString().slice(0, 10),
     effectiveTo: record.effectiveTo ? record.effectiveTo.toISOString().slice(0, 10) : null,
-    baseSalary: base,
+    baseSalary: Number(record.baseSalary),
     currency: record.currency,
     payFrequency: record.payFrequency,
     housingAllowance: Number(record.housingAllowance),
@@ -58,7 +61,7 @@ function serializeRecord(record: {
     variablePayPercent: Number(record.variablePayPercent),
     // Precomputed so every client shows the same figure rather than each one
     // reimplementing the arithmetic.
-    totalFixed: Number((base + allowances).toFixed(2)),
+    totalFixed: toAmount(totalFixed),
     changeReason: record.changeReason,
     note: record.note,
     isCurrent: record.isCurrent,

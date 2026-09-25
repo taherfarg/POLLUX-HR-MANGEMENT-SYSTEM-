@@ -253,8 +253,14 @@ export async function listHolidays(
     where: {
       ...(entityId ? { legalEntityId: entityId } : {}),
       ...(filters.calendarId ? { calendarId: filters.calendarId } : {}),
+      // A holiday that recurs every year belongs to every year's list.
       ...(year
-        ? { date: { gte: new Date(Date.UTC(year, 0, 1)), lte: new Date(Date.UTC(year, 11, 31)) } }
+        ? {
+            OR: [
+              { date: { gte: new Date(Date.UTC(year, 0, 1)), lte: new Date(Date.UTC(year, 11, 31)) } },
+              { isRecurringAnnually: true },
+            ],
+          }
         : {}),
     },
     include: holidayInclude,
