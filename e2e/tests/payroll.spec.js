@@ -67,9 +67,18 @@ test.describe('Payroll and payslips', () => {
     const slip = payslips.body.data.find((entry) => entry.period.id === open.id)
     expect(slip, 'a payslip for the approved month').toBeTruthy()
 
-    const popup = page.waitForEvent('popup')
-    await row.getByRole('button', { name: 'PDF' }).click()
-    await expect((await popup)).toHaveURL(/^blob:/)
+    // The button opens a new tab and fetches the stored PDF with the user's
+    // token. Whether the tab then shows it or downloads it depends on the
+    // browser having a PDF viewer (headless builds do not), so the assertion is
+    // on the tab opening and the PDF arriving, not on how it is displayed.
+    const [tab, pdfResponse] = await Promise.all([
+      page.waitForEvent('popup'),
+      page.waitForResponse((response) => /\/payslips\/[^/]+\/pdf/.test(response.url())),
+      row.getByRole('button', { name: 'PDF' }).click(),
+    ])
+    expect(pdfResponse.status()).toBe(200)
+    expect(pdfResponse.headers()['content-type']).toContain('application/pdf')
+    await tab.close()
 
     const pdf = await fileAs(page, `/payslips/${slip.id}/pdf`)
     expect(pdf.status).toBe(200)

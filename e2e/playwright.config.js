@@ -31,7 +31,10 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  // No retries: every flow changes the shared data (a check-in, a leave
+  // request, an approved payroll), so a retry starts from a different state and
+  // can only fail again with a misleading error that hides the first one.
+  retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   timeout: 90_000,
   expect: { timeout: 15_000 },
