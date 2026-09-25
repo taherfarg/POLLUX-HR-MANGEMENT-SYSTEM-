@@ -62,10 +62,16 @@ jobs:
           DATABASE_URL: postgresql://ems:ems_local_password@localhost:5434/ems_migrations?schema=public
         run: npx prisma migrate deploy
 
+      # The Pollux seed runs attendance, advances and payroll through the real
+      # services, which validate the whole API environment - hence the CI-only
+      # placeholder secrets.
       - name: Seed the migrated database
         working-directory: ${{ env.BACKEND }}
         env:
           DATABASE_URL: postgresql://ems:ems_local_password@localhost:5434/ems_migrations?schema=public
+          JWT_ACCESS_SECRET: ci_only_access_secret_0123456789abcdefghij
+          JWT_REFRESH_SECRET: ci_only_refresh_secret_9876543210zyxwvutsrq
+          LOG_LEVEL: silent
         run: npm run db:seed
 
       - name: Test
@@ -147,14 +153,14 @@ jobs:
         working-directory: e2e
         run: npx playwright install --with-deps chromium
 
-      # `npm test` runs prepare-db.mjs first, which creates and seeds the
-      # dedicated ems_e2e database, then Playwright boots the API and the web
+      # `npm test` runs prepare-db.mjs first, which migrates and seeds the
+      # dedicated pollux_e2e database, then Playwright boots the API and the web
       # app itself via its `webServer` config.
       - name: Run acceptance suite
         working-directory: e2e
         env:
           CI: 'true'
-          E2E_DATABASE_URL: postgresql://ems:ems_local_password@localhost:5433/ems_e2e?schema=public
+          E2E_DATABASE_URL: postgresql://ems:ems_local_password@localhost:5433/pollux_e2e?schema=public
         run: npm test
 
       - uses: actions/upload-artifact@v4

@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test'
 import { ACCOUNTS, gotoPage, signIn, trackPageHealth } from '../helpers.js'
 
 /**
- * Runs in the `mobile` project at 390x844. The brief requires a responsive,
- * mobile-friendly experience, so the assertion that matters is that nothing
- * overflows the viewport horizontally and the navigation is still reachable.
+ * Runs in the `mobile` project at 390x844. People check in from their phones
+ * and HR approves on the move, so the assertion that matters is that nothing
+ * overflows the viewport horizontally and the navigation stays reachable.
  */
 async function expectNoHorizontalOverflow(page, label) {
   const overflow = await page.evaluate(() => ({
@@ -22,42 +22,44 @@ async function expectNoHorizontalOverflow(page, label) {
 }
 
 test.describe('Mobile layout', () => {
-  test('employee pages fit the viewport and the drawer navigation works', async ({ page }) => {
+  test('employee pages fit the phone and check-in is one tap away', async ({ page }) => {
     const health = trackPageHealth(page)
     await signIn(page, ACCOUNTS.employee)
 
-    // The sidebar is collapsed behind a labelled control at this width.
+    // The sidebar sits behind a labelled menu button at this width.
     await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible()
+    await expect(page.getByRole('region', { name: "Today's attendance" })).toBeVisible()
+    await expectNoHorizontalOverflow(page, 'employee home')
 
-    for (const label of ['Home', 'My profile', 'My requests']) {
+    for (const label of ['My attendance', 'My requests', 'My pay', 'My documents', 'My profile']) {
       await gotoPage(page, label)
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expectNoHorizontalOverflow(page, `employee ${label}`)
     }
     health.assertClean()
   })
 
-  test('admin pages fit the viewport, including the directory', async ({ page }) => {
+  test('HR pages fit the phone, tables become cards', async ({ page }) => {
     const health = trackPageHealth(page)
-    await signIn(page, ACCOUNTS.admin)
+    await signIn(page, ACCOUNTS.hr)
+    await expectNoHorizontalOverflow(page, 'dashboard')
 
-    for (const label of ['Overview', 'People', 'Requests', 'Legal entities']) {
+    for (const label of ['Employees', 'Attendance', 'Requests', 'Leave balances', 'Payroll runs', 'Salary advances', 'Reports', 'Audit logs']) {
       await gotoPage(page, label)
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-      await expectNoHorizontalOverflow(page, `admin ${label}`)
+      await expectNoHorizontalOverflow(page, `HR ${label}`)
     }
+    // Column headers are hidden; each cell labels itself.
+    await expect(page.locator('.data-table.responsive thead').first()).toBeHidden()
     health.assertClean()
   })
 
-  test('the leave request modal is usable and closable on a phone', async ({ page }) => {
+  test('a request form opens full width and can always be closed', async ({ page }) => {
     await signIn(page, ACCOUNTS.employee)
-    await page.getByRole('button', { name: 'Request leave' }).first().click()
+    await gotoPage(page, 'My requests')
+    await page.getByRole('button', { name: 'Request leave' }).click()
 
-    const dialog = page.getByRole('dialog')
+    const dialog = page.getByRole('dialog', { name: 'Request time away' })
     await expect(dialog).toBeVisible()
-    await expectNoHorizontalOverflow(page, 'leave modal')
-
-    // There must always be a way out of a modal.
+    await expectNoHorizontalOverflow(page, 'leave form')
     await dialog.getByRole('button', { name: 'Close' }).click()
     await expect(dialog).toBeHidden()
   })
