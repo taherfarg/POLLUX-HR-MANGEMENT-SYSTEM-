@@ -29,11 +29,15 @@ POLLUX-HR-MANGEMENT-SYSTEM-/        <- repository root, render.yaml lives here
 ## 1. Database on Neon (3 min)
 
 1. Sign up at [neon.tech](https://neon.tech) and create a project (or a new database in an existing one — never the Matajer demo's) in the region closest to the Render region in `render.yaml` (Singapore, `ap-southeast-1`).
-2. Copy the **pooled** connection string. It looks like:
+2. On the project dashboard click **Connect**, turn **Connection pooling off**, and copy the
+   connection string. It is the **direct** one - the host has no `-pooler`:
    ```
-   postgresql://user:pass@ep-xxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
+   postgresql://neondb_owner:<password>@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
    ```
-3. Keep it for step 2. Use the **pooled** string, not the direct one — Render's free tier recycles containers and a pooler handles that far better.
+3. Keep it for steps 2 and 4. Use the direct string: the API runs `prisma migrate deploy`
+   every time it starts, and Prisma's migration engine does not work through a
+   transaction-mode pooler such as Neon's pooled endpoint. The app's handful of
+   connections is well within Neon's limits.
 
 ---
 
@@ -45,7 +49,7 @@ POLLUX-HR-MANGEMENT-SYSTEM-/        <- repository root, render.yaml lives here
 
    | Variable | Value |
    |---|---|
-   | `DATABASE_URL` | the Neon pooled string from step 1 |
+   | `DATABASE_URL` | the Neon direct connection string from step 1 |
    | `SEED_DEMO_PASSWORD` | `Passw0rd!23` (or your own — it becomes every demo account's password) |
    | `CORS_ORIGINS` | leave blank for now, filled in step 3 |
    | `GOOGLE_API_KEY` | optional; leave blank to use letter templates. Key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
@@ -100,8 +104,7 @@ and `$env:SEED_DEMO_PASSWORD="..."`, then run the last line as two commands.
 - The JWT values only satisfy the environment check - the seed issues no tokens - so they
   need not match the API's.
 - The seed makes a few thousand queries; from a laptop far from the database it can take
-  several minutes. If the pooled connection string gives errors, use the direct
-  (non-pooled) one for this step.
+  several minutes. Use the same direct connection string as the API.
 - Expected output: POLLUX MOTORS FZE with 7 departments, 4 work locations, 14 employees
   and 7 logins, the previous month's payroll paid and the current month's calculated.
 
@@ -149,7 +152,9 @@ Option 2 is what I would do: free, and the evaluator never sees a cold start.
 |---|---|---|
 | Login fails, console shows a CORS error | `CORS_ORIGINS` missing the scheme, or has a trailing slash | Must be exactly `https://pollux-hr-web.onrender.com` |
 | Frontend calls `localhost:4000` | `VITE_API_URL` set after the build | Set it, then **Manual Deploy → Clear build cache & deploy** |
-| API starts then exits | `DATABASE_URL` unreachable or wrong | Check the Neon string is the **pooled** one and includes `?sslmode=require` |
+| API starts then exits | `DATABASE_URL` unreachable or wrong | Check the Neon string is the **direct** one (no `-pooler` in the host) and includes `?sslmode=require` |
 | `Refusing to start in production with the development JWT secrets` | Secrets were copied from `.env.example` | Let Render generate them, or set 32+ character random values |
-| Login returns 500 | Schema missing — migrations did not run | Check the deploy log for `prisma migrate deploy`; run it manually in the Shell |
+| Login returns 500 | Schema missing — migrations did not run | Check the deploy log for `prisma migrate deploy`; step 4 also runs it from your checkout |
+| Deploy log shows `prepared statement "s0" already exists` or an advisory-lock timeout | `DATABASE_URL` is Neon's pooled string | Use the direct string (Connection pooling off) |
+| Prisma says the database string is invalid | An extra parameter in the copied string | Keep `?sslmode=require`; remove anything else, such as `&channel_binding=require` |
 | Directory empty after login | Seed never ran | Run the seed as in step 4 |
