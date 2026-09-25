@@ -6,6 +6,13 @@
 This document was written *before* any code was changed, after a full audit of the
 repository (Phase 0). It records what exists, what stays, what changes, and why.
 
+> **Status: implemented.** What was built is described in
+> [POLLUX-HR-ARCHITECTURE.md](POLLUX-HR-ARCHITECTURE.md),
+> [ATTENDANCE-DESIGN.md](ATTENDANCE-DESIGN.md), [PAYROLL-DESIGN.md](PAYROLL-DESIGN.md)
+> and [PERMISSIONS.md](PERMISSIONS.md). Two details differ from this plan: the "Me"
+> navigation group replaced "My workspace", and the E2E suite prepares its own
+> `pollux_e2e` database with `prisma migrate deploy` rather than `db push`.
+
 ---
 
 ## 0. Keeping the original recoverable

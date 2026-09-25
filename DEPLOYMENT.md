@@ -75,15 +75,27 @@ Redeploy both. `VITE_API_URL` is baked in at build time, so the frontend **must*
 
 ## 4. Load the demo data (2 min)
 
-The schema is created by the migration, but the demo employees are not. On **ems-api** → **Shell**:
+The schema is created by the migration, but the demo company is not. The seed runs
+TypeScript through the application's own services, so run it from a checkout of this
+repository (the production image ships only compiled code), pointed at the hosted
+database:
 
 ```bash
+cd "Employee Management Platform BackEnd" && npm ci
+DATABASE_URL="<the Neon connection string>" \
+JWT_ACCESS_SECRET="seed-only-placeholder-access-0123456789abcdef" \
+JWT_REFRESH_SECRET="seed-only-placeholder-refresh-0123456789abcdef" \
+SEED_DEMO_PASSWORD="<the demo password you want>" \
 npm run db:seed
 ```
 
-Expected output ends with `Seed complete.` and lists 3 legal entities, 18 employees, 40 requests.
+The JWT values only satisfy the environment check - the seed issues no tokens - so they
+need not match the API's. Expected output: POLLUX MOTORS FZE with 7 departments,
+4 work locations, 14 employees and 7 logins, the previous month's payroll paid and the
+current month's calculated.
 
-Run this **once**. It clears and rebuilds the demo data every time, so re-running it discards anything created during evaluation.
+Run this **once**. It clears and rebuilds the demo data every time, so re-running it
+discards anything created during evaluation.
 
 ---
 
@@ -99,8 +111,10 @@ Then open the frontend URL and sign in:
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@matajer.demo` | `Passw0rd!23` |
-| Employee | `employee@matajer.demo` | `Passw0rd!23` |
+| Administrator | `admin@pollux.demo` | the `SEED_DEMO_PASSWORD` you seeded with |
+| HR | `hr@pollux.demo` | same |
+| Manager | `manager@pollux.demo` | same |
+| Employee | `employee@pollux.demo` | same |
 
 ---
 
@@ -127,4 +141,4 @@ Option 2 is what I would do: free, and the evaluator never sees a cold start.
 | API starts then exits | `DATABASE_URL` unreachable or wrong | Check the Neon string is the **pooled** one and includes `?sslmode=require` |
 | `Refusing to start in production with the development JWT secrets` | Secrets were copied from `.env.example` | Let Render generate them, or set 32+ character random values |
 | Login returns 500 | Schema missing — migrations did not run | Check the deploy log for `prisma migrate deploy`; run it manually in the Shell |
-| Directory empty after login | Seed never ran | Run `npm run db:seed` in the API Shell |
+| Directory empty after login | Seed never ran | Run the seed as in step 4 |
