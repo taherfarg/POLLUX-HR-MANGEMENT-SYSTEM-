@@ -74,6 +74,7 @@ function fullView(entity: EntityRow, settings: CompanySettings) {
       employeeNumberPrefix: settings.employeeNumberPrefix,
     },
     attendance: {
+      attendanceStartDate: settings.attendanceStartDate ? settings.attendanceStartDate.toISOString().slice(0, 10) : null,
       lateGraceMinutes: settings.lateGraceMinutes,
       earlyLeaveGraceMinutes: settings.earlyLeaveGraceMinutes,
       partialDayThresholdPercent: settings.partialDayThresholdPercent,
@@ -197,6 +198,12 @@ export async function updateSettings(
     employeeNumberPrefix: company.employeeNumberPrefix,
     defaultWorkScheduleId: defaults.defaultWorkScheduleId,
     defaultHolidayCalendarId: defaults.defaultHolidayCalendarId,
+    attendanceStartDate:
+      attendance.attendanceStartDate === undefined
+        ? undefined
+        : attendance.attendanceStartDate === null
+          ? null
+          : new Date(`${attendance.attendanceStartDate}T00:00:00.000Z`),
     lateGraceMinutes: attendance.lateGraceMinutes,
     earlyLeaveGraceMinutes: attendance.earlyLeaveGraceMinutes,
     partialDayThresholdPercent: attendance.partialDayThresholdPercent,

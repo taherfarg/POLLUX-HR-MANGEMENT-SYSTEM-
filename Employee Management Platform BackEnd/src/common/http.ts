@@ -14,6 +14,24 @@ export function sendCreated<T>(res: Response, data: T): Response {
   return res.status(201).json({ data });
 }
 
+/**
+ * Sends a stored file. The name is reduced to a safe character set before it
+ * goes into a header, and sensitive files (payslips, exports) are never cached
+ * by the browser or a proxy.
+ */
+export function sendFile(
+  res: Response,
+  file: { fileName: string; mimeType: string; data: Buffer },
+  asAttachment = false,
+): Response {
+  const safeName = file.fileName.replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 150) || 'file';
+  res.setHeader('Content-Type', file.mimeType);
+  res.setHeader('Content-Length', String(file.data.length));
+  res.setHeader('Content-Disposition', `${asAttachment ? 'attachment' : 'inline'}; filename="${safeName}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  return res.status(200).send(file.data);
+}
+
 export interface PageMeta {
   page: number;
   pageSize: number;

@@ -360,8 +360,9 @@ export async function listAttendance(
     for (const day of loaded.get(subject.id)?.days ?? []) {
       if (day.evaluation.status === 'NOT_EMPLOYED') continue;
       if (!query.includeRestDays && !day.record && (day.plan.dayType === 'WEEKEND' || day.plan.dayType === 'HOLIDAY')) continue;
-      // Future days carry no information in a register.
-      if (day.evaluation.status === 'SCHEDULED' && !day.record) continue;
+      // Future days, and days nobody was expected to record, carry no
+      // information in a register.
+      if ((day.evaluation.status === 'SCHEDULED' || day.evaluation.status === 'NOT_TRACKED') && !day.record) continue;
       if (query.status && !query.status.includes(day.evaluation.status as (typeof query.status)[number])) continue;
       rows.push({ day, subject });
     }
@@ -513,7 +514,7 @@ export async function getBoard(auth: AuthContext, query: BoardQuery, now: Date =
   }
   counts.missingCheckout = missingCheckouts.length;
 
-  const statusOrder = ['NOT_CHECKED_IN', 'ABSENT', 'LATE', 'MISSING_CHECKOUT', 'PARTIAL', 'PRESENT', 'SCHEDULED', 'ON_LEAVE', 'HOLIDAY', 'WEEKEND'];
+  const statusOrder = ['NOT_CHECKED_IN', 'ABSENT', 'LATE', 'MISSING_CHECKOUT', 'PARTIAL', 'PRESENT', 'SCHEDULED', 'NOT_TRACKED', 'ON_LEAVE', 'HOLIDAY', 'WEEKEND'];
   rows.sort(
     (a, b) =>
       statusOrder.indexOf(String(a.status)) - statusOrder.indexOf(String(b.status)) ||

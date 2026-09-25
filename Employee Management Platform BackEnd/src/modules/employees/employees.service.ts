@@ -367,6 +367,7 @@ export async function createEmployee(
         workCity: input.workCity ?? null,
         timezone: input.timezone ?? null,
         overtimeEligible: input.overtimeEligible ?? true,
+        attendanceTracked: input.attendanceTracked ?? true,
       },
       include: employeeDetailInclude,
     });
@@ -585,6 +586,7 @@ export async function updateEmployee(
   assign('workCity', input.workCity);
   assign('timezone', input.timezone);
   assign('overtimeEligible', input.overtimeEligible);
+  assign('attendanceTracked', input.attendanceTracked);
 
   if (input.dateOfBirth) data.dateOfBirth = toUtcDate(input.dateOfBirth);
   if (input.hireDate) data.hireDate = toUtcDate(input.hireDate);

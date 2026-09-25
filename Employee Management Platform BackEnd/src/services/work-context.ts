@@ -58,6 +58,8 @@ export interface EmployeeWorkContext {
   workWeek: number[];
   holidayCalendarId: string | null;
   overtimeEligible: boolean;
+  /** False when the employee does not check in: no-show days are not absences. */
+  attendanceTracked: boolean;
   settings: CompanySettings;
 }
 
@@ -122,6 +124,7 @@ const employeeContextSelect = {
   timezone: true,
   holidayCalendarId: true,
   overtimeEligible: true,
+  attendanceTracked: true,
   workLocation: { select: { timezone: true } },
   workSchedule: { include: { days: true } },
   legalEntity: { select: { timezone: true, workWeek: true, weeklyHours: true } },
@@ -199,6 +202,7 @@ export async function loadWorkContexts(
         firstCalendarByEntity.get(employee.legalEntityId) ??
         null,
       overtimeEligible: employee.overtimeEligible,
+      attendanceTracked: employee.attendanceTracked,
       settings,
     });
   }

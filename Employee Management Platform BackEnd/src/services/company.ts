@@ -31,6 +31,7 @@ export function defaultCompanySettings(legalEntityId: string, displayName: strin
     employeeNumberPrefix: null,
     defaultWorkScheduleId: null,
     defaultHolidayCalendarId: null,
+    attendanceStartDate: null,
     lateGraceMinutes: 10,
     earlyLeaveGraceMinutes: 10,
     partialDayThresholdPercent: 50,

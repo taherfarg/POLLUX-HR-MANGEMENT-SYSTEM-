@@ -22,13 +22,14 @@ import type { HolidayEntry, ResolvedSchedule } from '../../services/work-context
  */
 
 /**
- * Statuses the evaluator can return. The first eight are persisted; the last
- * three only ever describe a day with no stored record:
+ * Statuses the evaluator can return. The first eight are persisted; the others
+ * only ever describe a day with no stored record:
  *   SCHEDULED       a working day that has not started yet (or not due yet)
  *   NOT_CHECKED_IN  today, past start + grace, and no check-in so far
  *   NOT_EMPLOYED    before the hire date or after the exit date
+ *   NOT_TRACKED     a working day for someone whose attendance is not tracked
  */
-export type EvaluatedStatus = AttendanceStatus | 'SCHEDULED' | 'NOT_CHECKED_IN' | 'NOT_EMPLOYED';
+export type EvaluatedStatus = AttendanceStatus | 'SCHEDULED' | 'NOT_CHECKED_IN' | 'NOT_EMPLOYED' | 'NOT_TRACKED';
 
 export interface AttendancePolicy {
   lateGraceMinutes: number;
@@ -207,7 +208,7 @@ export function evaluateDay(
   plan: DayPlan,
   facts: DayFacts | null,
   policy: AttendancePolicy,
-  options: { overtimeEligible: boolean; now: Date; todayKey: string },
+  options: { overtimeEligible: boolean; now: Date; todayKey: string; attendanceTracked?: boolean },
 ): DayEvaluation {
   if (!plan.isEmployed) {
     return { ...EMPTY, status: 'NOT_EMPLOYED' };
@@ -227,6 +228,8 @@ export function evaluateDay(
     if (plan.dayType === 'HOLIDAY') return { ...EMPTY, status: 'HOLIDAY' };
     if (plan.dayType === 'WEEKEND') return { ...EMPTY, status: 'WEEKEND' };
     if (plan.dayType === 'LEAVE') return { ...EMPTY, status: 'ON_LEAVE' };
+    // Someone who does not check in cannot be absent for not checking in.
+    if (options.attendanceTracked === false) return { ...EMPTY, status: 'NOT_TRACKED' };
 
     if (plan.dateKey > options.todayKey) return { ...EMPTY, status: 'SCHEDULED' };
     if (plan.dateKey === options.todayKey) {
@@ -330,6 +333,7 @@ export function persistableStatus(status: EvaluatedStatus): AttendanceStatus {
     case 'SCHEDULED':
     case 'NOT_CHECKED_IN':
     case 'NOT_EMPLOYED':
+    case 'NOT_TRACKED':
       return 'PRESENT';
     default:
       return status;

@@ -159,6 +159,17 @@ function storedEvaluation(record: AttendanceRecord): DayEvaluation {
   };
 }
 
+/**
+ * Whether a missing check-in on this date means anything: not for someone
+ * whose attendance is not tracked, and not before the company started
+ * tracking attendance at all.
+ */
+export function isTrackedDay(context: EmployeeWorkContext, dateKey: string): boolean {
+  if (!context.attendanceTracked) return false;
+  const start = context.settings.attendanceStartDate;
+  return !start || dateKey >= toDateKey(start);
+}
+
 export function evaluateStoredOrVirtual(
   context: EmployeeWorkContext,
   plan: DayPlan,
@@ -168,7 +179,15 @@ export function evaluateStoredOrVirtual(
 ): { plan: DayPlan; evaluation: DayEvaluation } {
   const policy = attendancePolicy(context.settings);
   if (!record) {
-    return { plan, evaluation: evaluateDay(plan, null, policy, { overtimeEligible: context.overtimeEligible, now, todayKey }) };
+    return {
+      plan,
+      evaluation: evaluateDay(plan, null, policy, {
+        overtimeEligible: context.overtimeEligible,
+        attendanceTracked: isTrackedDay(context, plan.dateKey),
+        now,
+        todayKey,
+      }),
+    };
   }
   const effectivePlan = snapshotPlan(plan, record);
   const isComplete = Boolean(record.checkOut) || (!record.checkIn && record.statusOverridden);

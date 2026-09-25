@@ -64,6 +64,24 @@ describe('Pollux organisation structure', () => {
       expect(entry?.after).toMatchObject({ attendance: { lateGraceMinutes: 15 } });
     });
 
+    it('sets and clears the attendance tracking start date', async () => {
+      const set = await asUser(adminToken)
+        .patch(`/api/v1/settings/company?legalEntityId=${fixture.entityAe}`)
+        .send({ attendance: { attendanceStartDate: '2026-09-01' } });
+      expect(set.status).toBe(200);
+      expect(set.body.data.attendance.attendanceStartDate).toBe('2026-09-01');
+
+      const cleared = await asUser(adminToken)
+        .patch(`/api/v1/settings/company?legalEntityId=${fixture.entityAe}`)
+        .send({ attendance: { attendanceStartDate: null } });
+      expect(cleared.body.data.attendance.attendanceStartDate).toBeNull();
+
+      const invalid = await asUser(adminToken)
+        .patch(`/api/v1/settings/company?legalEntityId=${fixture.entityAe}`)
+        .send({ attendance: { attendanceStartDate: '2026-02-30x' } });
+      expect(invalid.status).toBe(422);
+    });
+
     it('rejects an unknown timezone', async () => {
       const response = await asUser(adminToken)
         .patch(`/api/v1/settings/company?legalEntityId=${fixture.entityAe}`)

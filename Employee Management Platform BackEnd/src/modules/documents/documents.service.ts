@@ -1,13 +1,15 @@
 import { z } from 'zod';
 import { prisma } from '../../db/prisma';
 import { dateStringSchema, optionalTrimmedString, requiredTrimmedString, toUtcDate } from '../../common/validate';
-import { NotFoundError } from '../../common/errors';
+import { ConflictError, NotFoundError } from '../../common/errors';
 import type { AuthContext } from '../../common/auth-context';
 import {
   assertCanViewDocuments,
   assertCanEditEmployee,
   canViewConfidentialDocuments,
+  isSelf,
 } from '../../services/access';
+import { isLockedPayrollStatus } from '../../services/payroll-lock';
 import { recordAudit, type AuditInput } from '../../services/audit.service';
 import { notifyEmployee } from '../../services/notification.service';
 
@@ -20,6 +22,10 @@ type Fingerprint = Pick<AuditInput, 'ipAddress' | 'userAgent'>;
  * prototype - they add infrastructure without demonstrating anything about the
  * HR domain. The model is storage-agnostic, so swapping `fileUrl` for an S3 or
  * Supabase Storage key later touches one field.
+ *
+ * The one exception is files the platform generates itself - payslip PDFs -
+ * whose bytes live in `document_files` and are served by the download route.
+ * Listing never loads them.
  */
 export const createDocumentSchema = z.object({
   category: z.enum(['CONTRACT', 'IDENTIFICATION', 'VISA_PERMIT', 'CERTIFICATE', 'LETTER', 'PAYSLIP', 'OTHER']),
@@ -57,6 +63,8 @@ export async function listEmployeeDocuments(auth: AuthContext, employeeId: strin
       // An employee sees their own documents except those HR marked confidential.
       ...(canViewConfidentialDocuments(auth, employee) ? {} : { isConfidential: false }),
     },
+    // Only the file's id: the bytes stay in the database until someone downloads.
+    include: { file: { select: { id: true } } },
     orderBy: [{ createdAt: 'desc' }],
   });
 
@@ -67,6 +75,8 @@ export async function listEmployeeDocuments(auth: AuthContext, employeeId: strin
     title: document.title,
     fileName: document.fileName,
     fileUrl: document.fileUrl,
+    hasStoredFile: Boolean(document.file),
+    downloadUrl: document.file ? `/api/v1/documents/${document.id}/download` : null,
     mimeType: document.mimeType,
     sizeBytes: document.sizeBytes,
     issuedOn: document.issuedOn?.toISOString().slice(0, 10) ?? null,
@@ -175,6 +185,54 @@ export async function getDocumentContent(auth: AuthContext, documentId: string):
   };
 }
 
+/**
+ * The stored bytes of a platform-generated document. Same access rule as
+ * reading a document; HR opening someone's payslip is recorded in the audit
+ * trail because a payslip is pay data.
+ */
+export async function downloadDocumentFile(
+  auth: AuthContext,
+  documentId: string,
+  fingerprint: Fingerprint,
+): Promise<{ fileName: string; mimeType: string; data: Buffer }> {
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+    select: {
+      id: true,
+      title: true,
+      category: true,
+      fileName: true,
+      isConfidential: true,
+      employee: { select: { id: true, legalEntityId: true, managerId: true, employeeNumber: true } },
+      file: { select: { data: true, mimeType: true } },
+    },
+  });
+  if (!document) {
+    throw new NotFoundError('Document');
+  }
+  assertCanViewDocuments(auth, document.employee);
+  if (document.isConfidential && !canViewConfidentialDocuments(auth, document.employee)) {
+    throw new NotFoundError('Document');
+  }
+  if (!document.file) {
+    throw new NotFoundError('Stored file');
+  }
+
+  if (document.category === 'PAYSLIP' && !isSelf(auth, document.employee)) {
+    await recordAudit({
+      action: 'VIEW_SENSITIVE',
+      entityType: 'Document',
+      entityId: document.id,
+      legalEntityId: document.employee.legalEntityId,
+      summary: `Downloaded "${document.title}" of employee ${document.employee.employeeNumber}`,
+      actor: auth,
+      ...fingerprint,
+    });
+  }
+
+  return { fileName: document.fileName, mimeType: document.file.mimeType, data: Buffer.from(document.file.data) };
+}
+
 export async function deleteEmployeeDocument(
   auth: AuthContext,
   documentId: string,
@@ -182,12 +240,24 @@ export async function deleteEmployeeDocument(
 ): Promise<void> {
   const document = await prisma.document.findUnique({
     where: { id: documentId },
-    select: { id: true, title: true, employee: { select: { id: true, legalEntityId: true, managerId: true, employeeNumber: true } } },
+    select: {
+      id: true,
+      title: true,
+      employee: { select: { id: true, legalEntityId: true, managerId: true, employeeNumber: true } },
+      payslipFor: { select: { period: { select: { status: true, name: true } } } },
+    },
   });
   if (!document) {
     throw new NotFoundError('Document');
   }
   assertCanEditEmployee(auth, document.employee);
+  // A payslip is part of an approved payroll. It is withdrawn by reopening
+  // that payroll - which is audited as such - never by deleting the file.
+  if (document.payslipFor && isLockedPayrollStatus(document.payslipFor.period.status)) {
+    throw new ConflictError(
+      `This payslip belongs to the ${document.payslipFor.period.status.toLowerCase()} payroll for ${document.payslipFor.period.name} and cannot be deleted`,
+    );
+  }
 
   await prisma.document.delete({ where: { id: documentId } });
 

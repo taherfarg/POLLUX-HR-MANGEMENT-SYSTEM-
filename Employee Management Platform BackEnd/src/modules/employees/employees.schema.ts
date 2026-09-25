@@ -117,6 +117,7 @@ const workContextFields = {
     .union([timeZoneSchema, z.null()])
     .optional(),
   overtimeEligible: z.boolean().optional(),
+  attendanceTracked: z.boolean().optional(),
 };
 
 /** Starting salary. Optional so HR can add an employee before pay is agreed. */

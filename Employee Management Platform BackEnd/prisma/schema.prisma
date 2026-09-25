@@ -355,6 +355,12 @@ model CompanySettings {
   defaultHolidayCalendarId String?
 
   // --- Attendance ----------------------------------------------------------
+  /// The day attendance tracking started. No absence is inferred for a day
+  /// before it - a company moving onto Pollux HR mid-month must not have the
+  /// weeks before go-live counted as absences (and deducted in payroll).
+  /// Existing companies are backfilled with the upgrade date. Null means
+  /// tracked from each employee's hire date.
+  attendanceStartDate         DateTime? @db.Date
   /// Arriving within this many minutes of the scheduled start is not late.
   lateGraceMinutes            Int @default(10)
   /// Leaving within this many minutes of the scheduled end is not early.
@@ -569,6 +575,9 @@ model Employee {
   holidayCalendarId String?
   /// Whether time beyond the schedule can become paid overtime.
   overtimeEligible  Boolean @default(true)
+  /// False for people who do not check in (a general manager, say): their
+  /// working days without a record are not treated as absences.
+  attendanceTracked Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1105,6 +1114,11 @@ model PayrollItem {
   rate      Decimal?        @db.Decimal(12, 4)
   amount    Decimal         @db.Decimal(12, 2)
   sortOrder Int             @default(0)
+  /// Where the line came from (OvertimeEntry, SalaryAdvanceInstallment,
+  /// PayrollAdjustment). The source row is linked back to this line only when
+  /// the payroll is approved, so recalculating a draft never strands anything.
+  sourceType String?
+  sourceId   String?
   createdAt DateTime        @default(now())
 
   record        PayrollRecord             @relation(fields: [recordId], references: [id], onDelete: Cascade)
@@ -1113,6 +1127,7 @@ model PayrollItem {
   adjustment    PayrollAdjustment?
 
   @@index([recordId])
+  @@index([sourceType, sourceId])
   @@map("payroll_items")
 }
 

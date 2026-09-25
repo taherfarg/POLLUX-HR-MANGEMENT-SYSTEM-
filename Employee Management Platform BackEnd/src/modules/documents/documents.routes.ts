@@ -1,10 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { asyncHandler } from '../../common/http';
+import { asyncHandler, sendData, sendFile } from '../../common/http';
 import { idParamSchema, parseParams } from '../../common/validate';
 import { authenticate, requireAdmin, requireAuth } from '../../middleware/authenticate';
 import { auditContextFromRequest } from '../../services/audit.service';
-import { sendData } from '../../common/http';
-import { deleteEmployeeDocument, getDocumentContent } from './documents.service';
+import { deleteEmployeeDocument, downloadDocumentFile, getDocumentContent } from './documents.service';
 
 /**
  * Documents are created and listed under `/employees/:id/documents`, where they
@@ -20,6 +19,16 @@ documentsRouter.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = parseParams(req, idParamSchema);
     sendData(res, await getDocumentContent(requireAuth(req), id));
+  }),
+);
+
+/** Stored bytes (payslip PDFs). Same access rule as reading the document. */
+documentsRouter.get(
+  '/:id/download',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = parseParams(req, idParamSchema);
+    const file = await downloadDocumentFile(requireAuth(req), id, auditContextFromRequest(req));
+    sendFile(res, file, req.query.download === '1');
   }),
 );
 

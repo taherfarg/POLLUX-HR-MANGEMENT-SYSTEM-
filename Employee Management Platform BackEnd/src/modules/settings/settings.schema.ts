@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { optionalTrimmedString, requiredTrimmedString } from '../../common/validate';
+import { dateStringSchema, optionalTrimmedString, requiredTrimmedString } from '../../common/validate';
 import { isValidTimeZone } from '../../services/timezone';
 
 export const timeZoneSchema = z
@@ -56,6 +56,8 @@ export const companySettingsUpdateSchema = z
       .optional(),
     attendance: z
       .object({
+        /** No absence is inferred before this date (the go-live date). */
+        attendanceStartDate: dateStringSchema.nullable(),
         lateGraceMinutes: z.coerce.number().int().min(0).max(240),
         earlyLeaveGraceMinutes: z.coerce.number().int().min(0).max(240),
         partialDayThresholdPercent: z.coerce.number().int().min(0).max(100),

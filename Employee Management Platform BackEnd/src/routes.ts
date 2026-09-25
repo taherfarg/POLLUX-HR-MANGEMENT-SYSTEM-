@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { advancesRouter } from './modules/advances/advances.routes';
 import { attendanceRouter } from './modules/attendance/attendance.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { auditRouter } from './modules/audit/audit.routes';
@@ -12,6 +13,7 @@ import { legalEntitiesRouter } from './modules/legal-entities/legal-entities.rou
 import { meRouter } from './modules/me/me.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { overtimeRouter } from './modules/overtime/overtime.routes';
+import { payrollRouter, payslipsRouter } from './modules/payroll/payroll.routes';
 import { requestsRouter } from './modules/requests/requests.routes';
 import { publicRouter, settingsRouter } from './modules/settings/settings.routes';
 import { workLocationsRouter } from './modules/work-locations/work-locations.routes';
@@ -38,6 +40,9 @@ apiRouter.get('/', (_req, res) => {
         holidayCalendars: '/api/v1/holiday-calendars',
         attendance: '/api/v1/attendance',
         overtime: '/api/v1/overtime',
+        advances: '/api/v1/advances',
+        payroll: '/api/v1/payroll',
+        payslips: '/api/v1/payslips',
         requests: '/api/v1/requests',
         leave: '/api/v1/leave',
         documents: '/api/v1/documents',
@@ -62,6 +67,9 @@ apiRouter.use('/work-schedules', workSchedulesRouter);
 apiRouter.use('/holiday-calendars', holidayCalendarsRouter);
 apiRouter.use('/attendance', attendanceRouter);
 apiRouter.use('/overtime', overtimeRouter);
+apiRouter.use('/advances', advancesRouter);
+apiRouter.use('/payroll', payrollRouter);
+apiRouter.use('/payslips', payslipsRouter);
 apiRouter.use('/requests', requestsRouter);
 apiRouter.use('/leave', leaveRouter);
 apiRouter.use('/documents', documentsRouter);

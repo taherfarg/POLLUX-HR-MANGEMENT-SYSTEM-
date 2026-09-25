@@ -174,7 +174,9 @@ export function serializeEmployeeDetail(
           workSchedule: employee.workSchedule,
           holidayCalendar: employee.holidayCalendar,
         }),
-    ...(level === 'FULL' ? { overtimeEligible: employee.overtimeEligible } : {}),
+    ...(level === 'FULL'
+      ? { overtimeEligible: employee.overtimeEligible, attendanceTracked: employee.attendanceTracked }
+      : {}),
     directReportCount: employee._count.directReports,
     capabilities: options.capabilities,
     // The linked login account is management information, not part of the
