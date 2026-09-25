@@ -1,5 +1,7 @@
+import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../db/prisma';
+import { buildPageMeta, paginationSchema, toSkipTake, type PageMeta } from '../../common/http';
 import { dateStringSchema, optionalTrimmedString, requiredTrimmedString, toUtcDate } from '../../common/validate';
 import { ConflictError, NotFoundError } from '../../common/errors';
 import type { AuthContext } from '../../common/auth-context';
@@ -7,7 +9,9 @@ import {
   assertCanViewDocuments,
   assertCanEditEmployee,
   canViewConfidentialDocuments,
+  isManagement,
   isSelf,
+  scopedEntityId,
 } from '../../services/access';
 import { isLockedPayrollStatus } from '../../services/payroll-lock';
 import { recordAudit, type AuditInput } from '../../services/audit.service';
@@ -41,6 +45,22 @@ export const createDocumentSchema = z.object({
 });
 
 export type CreateDocumentInput = z.infer<typeof createDocumentSchema>;
+
+const DOCUMENT_CATEGORIES = ['CONTRACT', 'IDENTIFICATION', 'VISA_PERMIT', 'CERTIFICATE', 'LETTER', 'PAYSLIP', 'OTHER'] as const;
+
+export const documentQuerySchema = paginationSchema.extend({
+  category: z.enum(DOCUMENT_CATEGORIES).optional(),
+  employeeId: optionalTrimmedString(40),
+  /** Expired, or expiring within 90 days. */
+  expiring: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
+  q: optionalTrimmedString(120),
+});
+
+export type DocumentQuery = z.infer<typeof documentQuerySchema>;
+
 
 async function loadSubject(employeeId: string) {
   const employee = await prisma.employee.findUnique({
@@ -270,4 +290,99 @@ export async function deleteEmployeeDocument(
     actor: auth,
     ...fingerprint,
   });
+}
+
+/**
+ * The document library. HR sees every document in scope - the place to chase
+ * expiring visas and passports; anyone else sees their own documents, minus
+ * those HR marked confidential. Never loads file bytes.
+ */
+export async function listDocuments(
+  auth: AuthContext,
+  query: DocumentQuery,
+): Promise<{ items: unknown[]; meta: PageMeta; summary: Record<string, number> }> {
+  const filters: Prisma.DocumentWhereInput[] = [];
+  if (isManagement(auth)) {
+    const scope = scopedEntityId(auth);
+    if (scope) filters.push({ employee: { legalEntityId: scope } });
+    if (query.employeeId) filters.push({ employeeId: query.employeeId });
+  } else if (auth.employeeId) {
+    filters.push({ employeeId: auth.employeeId, isConfidential: false });
+  } else {
+    filters.push({ id: '__none__' });
+  }
+  if (query.category) filters.push({ category: query.category });
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const horizon = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+  if (query.expiring) filters.push({ expiresOn: { lte: horizon } });
+  if (query.q) {
+    filters.push({
+      OR: [
+        { title: { contains: query.q, mode: 'insensitive' } },
+        { fileName: { contains: query.q, mode: 'insensitive' } },
+        { employee: { firstName: { contains: query.q, mode: 'insensitive' } } },
+        { employee: { lastName: { contains: query.q, mode: 'insensitive' } } },
+        { employee: { employeeNumber: { contains: query.q, mode: 'insensitive' } } },
+      ],
+    });
+  }
+  const where: Prisma.DocumentWhereInput = filters.length ? { AND: filters } : {};
+  const { skip, take } = toSkipTake(query);
+
+  const [documents, total, expiringCount, expiredCount] = await Promise.all([
+    prisma.document.findMany({
+      where,
+      select: {
+        id: true,
+        category: true,
+        title: true,
+        fileName: true,
+        fileUrl: true,
+        mimeType: true,
+        sizeBytes: true,
+        issuedOn: true,
+        expiresOn: true,
+        isConfidential: true,
+        createdAt: true,
+        file: { select: { id: true } },
+        employee: { select: { id: true, employeeNumber: true, firstName: true, lastName: true } },
+      },
+      orderBy: query.expiring ? [{ expiresOn: 'asc' }] : [{ createdAt: 'desc' }],
+      skip,
+      take,
+    }),
+    prisma.document.count({ where }),
+    prisma.document.count({ where: { AND: [...filters, { expiresOn: { gte: today, lte: horizon } }] } }),
+    prisma.document.count({ where: { AND: [...filters, { expiresOn: { lt: today } }] } }),
+  ]);
+
+  return {
+    items: documents.map((document) => ({
+      id: document.id,
+      category: document.category,
+      title: document.title,
+      fileName: document.fileName,
+      fileUrl: document.fileUrl,
+      mimeType: document.mimeType,
+      sizeBytes: document.sizeBytes,
+      issuedOn: document.issuedOn?.toISOString().slice(0, 10) ?? null,
+      expiresOn: document.expiresOn?.toISOString().slice(0, 10) ?? null,
+      isConfidential: document.isConfidential,
+      isExpired: document.expiresOn ? document.expiresOn < today : false,
+      daysUntilExpiry: document.expiresOn
+        ? Math.ceil((document.expiresOn.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+        : null,
+      hasStoredFile: Boolean(document.file),
+      downloadUrl: document.file ? `/api/v1/documents/${document.id}/download` : null,
+      createdAt: document.createdAt,
+      employee: {
+        id: document.employee.id,
+        employeeNumber: document.employee.employeeNumber,
+        fullName: `${document.employee.firstName} ${document.employee.lastName}`,
+      },
+    })),
+    meta: buildPageMeta(query.page, query.pageSize, total),
+    summary: { total, expiringSoon: expiringCount, expired: expiredCount },
+  };
 }

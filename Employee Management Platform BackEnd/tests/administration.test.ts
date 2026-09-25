@@ -308,6 +308,46 @@ describe('administration', () => {
   });
 
   // ---------------------------------------------------------------------------
+  describe('document library', () => {
+    beforeAll(async () => {
+      const soon = new Date(Date.now() + 30 * 86_400_000);
+      await prisma.document.createMany({
+        data: [
+          { employeeId: fixture.employee, category: 'VISA_PERMIT', title: 'Residence visa', fileName: 'visa.pdf', fileUrl: 'https://files.test/visa.pdf', expiresOn: soon },
+          { employeeId: fixture.employee, category: 'OTHER', title: 'Disciplinary note', fileName: 'note.pdf', fileUrl: 'https://files.test/note.pdf', isConfidential: true },
+          { employeeId: fixture.ksaEmployee, category: 'CONTRACT', title: 'KSA contract', fileName: 'contract.pdf', fileUrl: 'https://files.test/contract.pdf' },
+        ],
+      });
+    });
+
+    it('shows an employee their own documents without the confidential ones', async () => {
+      const response = await asUser(employeeToken).get('/api/v1/documents');
+      expect(response.status).toBe(200);
+      expect(response.body.data.map((document: { title: string }) => document.title)).toEqual(['Residence visa']);
+      // A filter for someone else changes nothing.
+      const other = await asUser(employeeToken).get(`/api/v1/documents?employeeId=${fixture.ksaEmployee}`);
+      expect(other.body.data.map((document: { title: string }) => document.title)).toEqual(['Residence visa']);
+    });
+
+    it('gives a manager nothing of their team\'s documents', async () => {
+      const response = await asUser(managerToken).get('/api/v1/documents');
+      expect(response.body.data).toEqual([]);
+    });
+
+    it('gives HR the library in scope with expiry counts', async () => {
+      const all = await asUser(adminToken).get('/api/v1/documents');
+      expect(all.body.meta.total).toBe(3);
+      expect(all.body.summary.expiringSoon).toBe(1);
+
+      const expiring = await asUser(adminToken).get('/api/v1/documents?expiring=true');
+      expect(expiring.body.data.map((document: { title: string }) => document.title)).toEqual(['Residence visa']);
+
+      const scoped = await asUser(hrKsaToken).get('/api/v1/documents');
+      expect(scoped.body.data.map((document: { title: string }) => document.title)).toEqual(['KSA contract']);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   describe('dashboards', () => {
     it('gives HR the company view with payroll', async () => {
       const response = await asUser(adminToken).get('/api/v1/dashboard');

@@ -1,9 +1,15 @@
 import { Router, type Request, type Response } from 'express';
 import { asyncHandler, sendData, sendFile } from '../../common/http';
-import { idParamSchema, parseParams } from '../../common/validate';
+import { idParamSchema, parseParams, parseQuery } from '../../common/validate';
 import { authenticate, requireAdmin, requireAuth } from '../../middleware/authenticate';
 import { auditContextFromRequest } from '../../services/audit.service';
-import { deleteEmployeeDocument, downloadDocumentFile, getDocumentContent } from './documents.service';
+import {
+  deleteEmployeeDocument,
+  documentQuerySchema,
+  downloadDocumentFile,
+  getDocumentContent,
+  listDocuments,
+} from './documents.service';
 
 /**
  * Documents are created and listed under `/employees/:id/documents`, where they
@@ -12,6 +18,16 @@ import { deleteEmployeeDocument, downloadDocumentFile, getDocumentContent } from
 export const documentsRouter: Router = Router();
 
 documentsRouter.use(authenticate);
+
+/** The library: HR's scope, or the caller's own non-confidential documents. */
+documentsRouter.get(
+  '/',
+  asyncHandler(async (req: Request, res: Response) => {
+    const query = parseQuery(req, documentQuerySchema);
+    const { items, meta, summary } = await listDocuments(requireAuth(req), query);
+    res.json({ data: items, meta, summary });
+  }),
+);
 
 /** Letter body. Open to the employee it belongs to, and to HR within scope. */
 documentsRouter.get(

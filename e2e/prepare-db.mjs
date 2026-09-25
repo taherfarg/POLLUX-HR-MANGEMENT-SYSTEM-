@@ -21,7 +21,17 @@ const E2E_DATABASE_URL =
   'postgresql://ems:ems_local_password@localhost:5433/ems_e2e?schema=public'
 
 const backend = resolve(dirname(fileURLToPath(import.meta.url)), '../Employee Management Platform BackEnd')
-const env = { ...process.env, DATABASE_URL: E2E_DATABASE_URL }
+// The seed runs payroll and attendance through the application's own services,
+// which validate the full API environment - so it gets the same e2e-only
+// secrets the API process is started with in playwright.config.js.
+const env = {
+  ...process.env,
+  DATABASE_URL: E2E_DATABASE_URL,
+  JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET ?? 'e2e_only_access_secret_0123456789abcdefghij',
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET ?? 'e2e_only_refresh_secret_9876543210zyxwvutsrq',
+  SEED_DEMO_PASSWORD: process.env.SEED_DEMO_PASSWORD ?? 'Passw0rd!23',
+  LOG_LEVEL: 'silent',
+}
 
 console.log('[e2e] preparing the acceptance database…')
 // `db push` rather than `migrate deploy`: the suite wants a schema matching the
