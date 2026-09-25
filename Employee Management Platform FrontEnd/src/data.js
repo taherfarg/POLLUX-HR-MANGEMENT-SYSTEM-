@@ -1,57 +1,21 @@
 /**
- * Static UI constants only.
+ * Static UI constants only. Organisational data comes from the API.
  *
- * All organisational data - entities, employees, requests - now comes from the
- * API. What remains here is presentation copy and the demo credentials the
- * login screen offers as a convenience; the credentials are still verified by
- * the backend, so the list is a shortcut, not an authentication path.
+ * The demo accounts are a convenience for the seeded demo: the credentials
+ * are still verified by the backend, so the list is a shortcut, not an
+ * authentication path. The password is the documented demo default
+ * (SEED_DEMO_PASSWORD) and never a production secret.
  */
 
+export const DEMO_PASSWORD = 'Passw0rd!23'
+
 export const DEMO_ACCOUNTS = [
-  {
-    label: 'Admin workspace',
-    description: 'Manage people & requests',
-    email: 'admin@matajer.demo',
-    password: 'Passw0rd!23',
-    tone: 'admin',
-  },
-  {
-    label: 'Employee workspace',
-    description: 'Profile & self-service',
-    email: 'employee@matajer.demo',
-    password: 'Passw0rd!23',
-    tone: 'employee',
-  },
+  { label: 'Administrator', description: 'Khalid · General Manager', email: 'admin@pollux.demo' },
+  { label: 'HR', description: 'Sara · HR Manager', email: 'hr@pollux.demo' },
+  { label: 'Manager', description: 'Youssef · Sales Manager', email: 'manager@pollux.demo' },
+  { label: 'Employee', description: 'Ahmed · Sales Executive', email: 'employee@pollux.demo' },
 ]
 
-export const LOGIN_HIGHLIGHTS = {
-  headline: '18 demo employees',
-  subline: 'Across UAE, Saudi Arabia & Egypt',
-  avatars: [
-    { initials: 'PR', color: '#e9b7a5' },
-    { initials: 'OA', color: '#9ec7bd' },
-    { initials: 'YK', color: '#f0c96d' },
-    { initials: 'HQ', color: '#b9add7' },
-  ],
-}
-
-export const NAV_BY_ROLE = {
-  admin: [
-    { id: 'overview', label: 'Overview' },
-    { id: 'people', label: 'People' },
-    { id: 'requests', label: 'Requests' },
-    { id: 'entities', label: 'Legal entities' },
-  ],
-  employee: [
-    { id: 'home', label: 'Home' },
-    { id: 'profile', label: 'My profile' },
-    { id: 'my-requests', label: 'My requests' },
-  ],
-}
-
-export const DEPARTMENT_FALLBACK = 'Unassigned'
-
-/** Leave types offered in the self-service form when the API list is unavailable. */
 export const DOCUMENT_REQUEST_TYPES = [
   { value: 'EMPLOYMENT_CERTIFICATE', label: 'Employment certificate' },
   { value: 'SALARY_CERTIFICATE', label: 'Salary certificate' },
@@ -61,7 +25,13 @@ export const DOCUMENT_REQUEST_TYPES = [
   { value: 'BANK_ACCOUNT_LETTER', label: 'Bank account letter' },
 ]
 
-export const EMPLOYEE_STATUS_OPTIONS = ['Active', 'Probation', 'On leave', 'Notice period', 'Offboarded']
+export const EMPLOYEE_STATUS_OPTIONS = [
+  { value: 'PROBATION', label: 'Probation' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'ON_LEAVE', label: 'On leave' },
+  { value: 'NOTICE_PERIOD', label: 'Notice period' },
+  { value: 'OFFBOARDED', label: 'Offboarded' },
+]
 
 export const EMPLOYMENT_TYPE_OPTIONS = [
   { value: 'FULL_TIME', label: 'Full-time' },
@@ -71,12 +41,39 @@ export const EMPLOYMENT_TYPE_OPTIONS = [
 ]
 
 export const WORK_MODE_OPTIONS = [
-  { value: 'ONSITE', label: 'On-site' },
+  { value: 'ONSITE', label: 'Office' },
   { value: 'HYBRID', label: 'Hybrid' },
   { value: 'REMOTE', label: 'Remote' },
+  { value: 'FIELD', label: 'Field' },
 ]
 
 export const CONTRACT_TYPE_OPTIONS = [
   { value: 'UNLIMITED', label: 'Unlimited' },
   { value: 'LIMITED', label: 'Limited term' },
 ]
+
+export const ROLE_OPTIONS = [
+  { value: 'EMPLOYEE', label: 'Employee' },
+  { value: 'MANAGER', label: 'Manager' },
+  { value: 'HR_ADMIN', label: 'HR admin' },
+  { value: 'ADMIN', label: 'Administrator' },
+]
+
+/** Common IANA zones for the people Pollux employs; any valid zone is accepted. */
+export const TIMEZONE_OPTIONS = [
+  'Asia/Dubai',
+  'Africa/Cairo',
+  'Africa/Algiers',
+  'Asia/Riyadh',
+  'Asia/Amman',
+  'Asia/Beirut',
+  'Asia/Karachi',
+  'Asia/Kolkata',
+  'Asia/Manila',
+  'Europe/London',
+  'Europe/Istanbul',
+  'Africa/Casablanca',
+  'Africa/Lagos',
+]
+
+export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']

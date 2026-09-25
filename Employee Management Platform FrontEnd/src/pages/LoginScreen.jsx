@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { ArrowRight, ArrowUpRight, Fingerprint, LockKeyhole, Mail, ShieldCheck, UserRound, X, XCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CalendarCheck2, Clock, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Wallet } from 'lucide-react'
 import { BrandMark, Spinner } from '../components/ui.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { DEMO_ACCOUNTS, LOGIN_HIGHLIGHTS } from '../data.js'
+import { fetchBranding } from '../api/endpoints.js'
+import { DEMO_ACCOUNTS, DEMO_PASSWORD } from '../data.js'
 
 export default function LoginScreen() {
   const { signIn } = useAuth()
@@ -11,17 +12,23 @@ export default function LoginScreen() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [branding, setBranding] = useState(null)
 
-  const useAccount = (account) => {
+  useEffect(() => {
+    fetchBranding()
+      .then(setBranding)
+      .catch(() => setBranding(null))
+  }, [])
+
+  const fillAccount = (account) => {
     setEmail(account.email)
-    setPassword(account.password)
+    setPassword(DEMO_PASSWORD)
     setError('')
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (submitting) return
-
     setError('')
     setSubmitting(true)
     try {
@@ -30,145 +37,116 @@ export default function LoginScreen() {
     } catch (caught) {
       setError(
         caught.status === 0
-          ? 'Cannot reach the server. Make sure the API is running on port 4000.'
+          ? 'Cannot reach the server. Make sure the API is running.'
           : caught.message || 'Sign in failed. Please try again.',
       )
       setSubmitting(false)
     }
   }
 
+  const company = branding?.companyName ?? 'POLLUX MOTORS FZE'
+
   return (
     <main className="login-page">
-      <div className="grain" aria-hidden="true" />
-      <section className="login-story" aria-label="About People Hub">
-        <div className="brand brand-light">
-          <BrandMark />
-          <span>People Hub</span>
-        </div>
-        <div className="login-copy">
-          <p className="login-kicker">
-            <span /> People operations, in one view
-          </p>
+      <section className="login-story" aria-label="About Pollux HR">
+        <span className="brand" style={{ color: 'white' }}>
+          <BrandMark size="lg" />
+          <span>
+            Pollux HR
+            <small>{company}</small>
+          </span>
+        </span>
+        <div>
           <h1>
-            Every person.
-            <br />
-            Every entity.
-            <br />
-            <em>One clear picture.</em>
+            People, time and pay for <em>Pollux Motors</em>, in one place.
           </h1>
-          <p>
-            A focused employee platform for a growing, multi-country team—built to keep people informed and
-            management in control.
-          </p>
-        </div>
-        <div className="login-proof">
-          <div className="avatar-stack" aria-hidden="true">
-            {LOGIN_HIGHLIGHTS.avatars.map((item) => (
-              <span className="avatar avatar-sm" style={{ background: item.color }} key={item.initials}>
-                {item.initials}
-              </span>
-            ))}
-            <span className="avatar avatar-sm avatar-count">+13</span>
-          </div>
-          <div>
-            <strong>{LOGIN_HIGHLIGHTS.headline}</strong>
-            <span>{LOGIN_HIGHLIGHTS.subline}</span>
+          <p>Check in from the showroom, the road or home. Request leave and advances. Run payroll with a second pair of eyes on every number.</p>
+          <div className="login-points">
+            <div>
+              <Clock size={18} /> Attendance in each person&apos;s own timezone and schedule
+            </div>
+            <div>
+              <CalendarCheck2 size={18} /> Leave balances and holidays that add up
+            </div>
+            <div>
+              <Wallet size={18} /> Monthly payroll with PDF payslips and salary advances
+            </div>
           </div>
         </div>
-        <div className="login-orbit orbit-one" />
-        <div className="login-orbit orbit-two" />
+        <p className="login-footnote">Dubai, United Arab Emirates</p>
       </section>
 
       <section className="login-panel">
-        <div className="mobile-brand brand">
-          <BrandMark />
-          <span>People Hub</span>
-        </div>
         <div className="login-form-wrap">
-          <p className="eyebrow">Secure workspace</p>
-          <h2>Welcome back</h2>
-          <p className="login-intro">Sign in with a demo account to explore the role-based experience.</p>
+          <span className="brand mobile-brand">
+            <BrandMark />
+            <span>Pollux HR</span>
+          </span>
+          <div>
+            <p className="eyebrow">{company}</p>
+            <h2>Sign in</h2>
+            <p className="muted">Use your work email and password.</p>
+          </div>
 
           <form onSubmit={handleSubmit} noValidate>
             <label className="field">
               <span>Work email</span>
               <div className="input-with-icon">
-                <Mail size={18} />
+                <Mail size={17} />
                 <input
                   type="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@company.com"
-                  autoComplete="username"
-                  disabled={submitting}
+                  placeholder="name@pollux.demo"
+                  aria-label="Work email"
                   required
                 />
               </div>
             </label>
-
             <label className="field">
               <span>Password</span>
               <div className="input-with-icon">
-                <LockKeyhole size={18} />
+                <LockKeyhole size={17} />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  disabled={submitting}
+                  aria-label="Password"
                   required
                 />
                 <button
-                  className="password-toggle"
                   type="button"
+                  className="password-toggle"
                   onClick={() => setShowPassword((value) => !value)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? <X size={17} /> : <Fingerprint size={17} />}
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
             </label>
-
             {error && (
               <div className="form-error" role="alert">
-                <XCircle size={17} />
                 {error}
               </div>
             )}
-
-            <button className="button button-primary button-wide" type="submit" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Spinner size={17} /> Signing in…
-                </>
-              ) : (
-                <>
-                  Sign in <ArrowRight size={18} />
-                </>
-              )}
+            <button className="button button-primary button-wide" type="submit" disabled={submitting || !email || !password}>
+              {submitting && <Spinner size={16} />} Sign in
             </button>
           </form>
 
-          <div className="demo-divider">
-            <span>Demo access</span>
-          </div>
+          <div className="demo-divider">Demo accounts</div>
           <div className="demo-accounts">
             {DEMO_ACCOUNTS.map((account) => (
-              <button key={account.email} onClick={() => useAccount(account)} type="button" disabled={submitting}>
-                <span className={`demo-icon demo-icon-${account.tone}`}>
-                  {account.tone === 'admin' ? <ShieldCheck size={19} /> : <UserRound size={19} />}
-                </span>
-                <span>
-                  <strong>{account.label}</strong>
-                  <small>{account.description}</small>
-                </span>
-                <ArrowUpRight size={17} />
+              <button type="button" key={account.email} onClick={() => fillAccount(account)}>
+                <strong>{account.label}</strong>
+                <small>{account.description}</small>
               </button>
             ))}
           </div>
           <p className="security-note">
-            <ShieldCheck size={14} /> Safe demo data only. No production systems are connected.
+            <ShieldCheck size={14} /> Every access rule is enforced by the server.
           </p>
         </div>
       </section>

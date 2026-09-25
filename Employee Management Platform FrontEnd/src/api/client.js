@@ -192,6 +192,44 @@ export async function apiRequest(path, { method = 'GET', body, params, auth = tr
   return payload
 }
 
+/**
+ * Fetches a file (payslip PDF, report export) with the same bearer token and
+ * refresh-once behaviour as JSON calls. Returns the blob and the file name the
+ * server suggested.
+ */
+export async function apiBlob(path, { params, retry = true } = {}) {
+  const headers = {}
+  const token = tokenStore.access
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  let response
+  try {
+    response = await fetch(buildUrl(path, params), { headers })
+  } catch {
+    throw new ApiError(0, {
+      error: { code: 'NETWORK_ERROR', message: 'Cannot reach the server. Check that the API is running and try again.' },
+    })
+  }
+
+  if (response.status === 401 && retry && tokenStore.refresh) {
+    const refreshed = await refreshAccessToken()
+    if (refreshed) return apiBlob(path, { params, retry: false })
+    notifySessionExpired()
+  }
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await parseBody(response))
+  }
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const match = /filename="([^"]+)"/.exec(disposition)
+  return {
+    blob: await response.blob(),
+    fileName: match?.[1] ?? 'download',
+    contentType: response.headers.get('Content-Type') ?? 'application/octet-stream',
+  }
+}
+
 /** Convenience wrapper for the common case of wanting only the payload. */
 export async function apiData(path, options) {
   const response = await apiRequest(path, options)

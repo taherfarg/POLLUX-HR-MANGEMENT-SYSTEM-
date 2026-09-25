@@ -1,24 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
-import {
-  Bell,
-  Building2,
-  CheckCircle2,
-  ChevronDown,
-  ClipboardCheck,
-  KeyRound,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Search,
-  UserRound,
-  UsersRound,
-  X,
-} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Bell, CheckCircle2, ChevronRight, KeyRound, LogOut, Menu, X } from 'lucide-react'
 import { Avatar, BrandMark, FormError, FormField, LoadingState, Modal, Spinner, Toast } from './components/ui.jsx'
+import { ClockButton } from './components/attendance.jsx'
 import { useAuth } from './hooks/useAuth.jsx'
-import { OrgProvider } from './hooks/useOrg.jsx'
+import { CompanyProvider, useCompany } from './hooks/useCompany.jsx'
 import { useResource } from './hooks/useResource.js'
+import { useRoute } from './hooks/useRoute.js'
 import { formatDate } from './lib/format.js'
+import { allowedPages, defaultPage, locatePage, navigationFor } from './navigation.js'
 import {
   changePassword,
   fetchNotifications,
@@ -27,61 +16,72 @@ import {
   markNotificationRead,
 } from './api/endpoints.js'
 import LoginScreen from './pages/LoginScreen.jsx'
-import AdminOverview from './pages/AdminOverview.jsx'
-import PeopleDirectory from './pages/PeopleDirectory.jsx'
-import AdminRequests from './pages/AdminRequests.jsx'
-import EntitiesPage from './pages/EntitiesPage.jsx'
-import EmployeeHome from './pages/EmployeeHome.jsx'
-import EmployeeProfile from './pages/EmployeeProfile.jsx'
-import EmployeeRequests from './pages/EmployeeRequests.jsx'
-import ManagerTeam from './pages/ManagerTeam.jsx'
+import DashboardPage from './pages/DashboardPage.jsx'
+import HomePage from './pages/HomePage.jsx'
+import EmployeesPage from './pages/EmployeesPage.jsx'
+import DepartmentsPage from './pages/DepartmentsPage.jsx'
+import WorkLocationsPage from './pages/WorkLocationsPage.jsx'
+import AttendancePage from './pages/AttendancePage.jsx'
+import TimesheetsPage from './pages/TimesheetsPage.jsx'
+import WorkSchedulesPage from './pages/WorkSchedulesPage.jsx'
+import OvertimePage from './pages/OvertimePage.jsx'
+import RequestsPage from './pages/RequestsPage.jsx'
+import LeaveBalancesPage from './pages/LeaveBalancesPage.jsx'
+import HolidaysPage from './pages/HolidaysPage.jsx'
+import PayrollPage from './pages/PayrollPage.jsx'
+import AdvancesPage from './pages/AdvancesPage.jsx'
+import AdjustmentsPage from './pages/AdjustmentsPage.jsx'
+import PayslipsPage from './pages/PayslipsPage.jsx'
+import DocumentsPage from './pages/DocumentsPage.jsx'
+import ReportsPage from './pages/ReportsPage.jsx'
+import UsersPage from './pages/UsersPage.jsx'
+import AuditLogsPage from './pages/AuditLogsPage.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
+import MyAttendancePage from './pages/MyAttendancePage.jsx'
+import MyRequestsPage from './pages/MyRequestsPage.jsx'
+import MyPayPage from './pages/MyPayPage.jsx'
+import MyProfilePage from './pages/MyProfilePage.jsx'
+import MyTeamPage from './pages/MyTeamPage.jsx'
 
-const NAV_BY_ROLE = {
-  admin: [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'people', label: 'People', icon: UsersRound },
-    { id: 'requests', label: 'Requests', icon: ClipboardCheck },
-    { id: 'entities', label: 'Legal entities', icon: Building2 },
-  ],
-  employee: [
-    { id: 'home', label: 'Home', icon: LayoutDashboard },
-    { id: 'profile', label: 'My profile', icon: UserRound },
-    { id: 'my-requests', label: 'My requests', icon: ClipboardCheck },
-  ],
-}
-
-/**
- * A line manager gets the employee workspace plus their team. The extra
- * destination is added here rather than as a third role list, because a manager
- * is an employee first - they still book their own leave.
- */
-const MANAGER_NAV_ITEM = { id: 'my-team', label: 'My team', icon: UsersRound }
-
-function navFor(session) {
-  const base = NAV_BY_ROLE[session.role]
-  return session.isManager ? [...base, MANAGER_NAV_ITEM] : base
-}
-
-const PAGE_META = {
-  overview: ['Overview', 'What needs your attention across the organization.'],
-  people: ['People directory', 'A single source of truth for every employee and legal entity.'],
-  requests: ['Request inbox', 'Review employee requests and keep every decision traceable.'],
-  entities: ['Legal entities', 'The operating structure behind every employment record.'],
-  home: ['Home', 'Everything about your work, requests, and time off in one place.'],
-  profile: ['My profile', 'Your personal and employment information.'],
-  'my-requests': ['My requests', 'Submit a request and follow it through to a clear decision.'],
-  'my-team': ['My team', 'Your direct reports, and the requests waiting on your decision.'],
+const PAGE_COMPONENTS = {
+  dashboard: DashboardPage,
+  home: HomePage,
+  employees: EmployeesPage,
+  departments: DepartmentsPage,
+  'work-locations': WorkLocationsPage,
+  attendance: AttendancePage,
+  timesheets: TimesheetsPage,
+  'work-schedules': WorkSchedulesPage,
+  overtime: OvertimePage,
+  requests: RequestsPage,
+  'leave-balances': LeaveBalancesPage,
+  holidays: HolidaysPage,
+  payroll: PayrollPage,
+  advances: AdvancesPage,
+  adjustments: AdjustmentsPage,
+  payslips: PayslipsPage,
+  documents: DocumentsPage,
+  reports: ReportsPage,
+  users: UsersPage,
+  'audit-logs': AuditLogsPage,
+  settings: SettingsPage,
+  'my-attendance': MyAttendancePage,
+  'my-requests': MyRequestsPage,
+  'my-pay': MyPayPage,
+  'my-documents': DocumentsPage,
+  'my-profile': MyProfilePage,
+  'my-team': MyTeamPage,
 }
 
 export default function App() {
   const { session, bootstrapping } = useAuth()
 
-  // Restoring a stored session is a network round trip; showing a boot screen
-  // avoids flashing the login page to an already-signed-in user.
+  // Restoring a stored session is a network round trip; a boot screen avoids
+  // flashing the login page to an already-signed-in user.
   if (bootstrapping) {
     return (
       <div className="boot-screen">
-        <BrandMark />
+        <BrandMark size="lg" />
         <LoadingState label="Restoring your session…" />
       </div>
     )
@@ -90,42 +90,48 @@ export default function App() {
   if (!session) return <LoginScreen />
 
   return (
-    <OrgProvider>
+    <CompanyProvider>
       <Workspace session={session} />
-    </OrgProvider>
+    </CompanyProvider>
   )
 }
 
 function Workspace({ session }) {
   const { signOut } = useAuth()
-  const [page, setPage] = useState(session.role === 'admin' ? 'overview' : 'home')
+  const route = useRoute()
   const [toast, setToast] = useState(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [securityOpen, setSecurityOpen] = useState(Boolean(session.mustChangePassword))
 
-  const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type, id: Date.now() })
+  const allowed = useMemo(() => allowedPages(session), [session])
+  const page = allowed.has(route.page) ? route.page : defaultPage(session)
+
+  const showToast = useCallback((message, type = 'success', options = {}) => {
+    setToast({ message, type, id: Date.now(), ...options })
   }, [])
 
-  // Signing in as a different role must not leave the previous role's page selected.
   useEffect(() => {
-    setPage(session.role === 'admin' ? 'overview' : 'home')
     setSecurityOpen(Boolean(session.mustChangePassword))
-  }, [session.role, session.userId])
+  }, [session.userId, session.mustChangePassword])
 
   const notifications = useResource(() => fetchNotifications(), [])
-  const pendingBadge = useResource(
-    () => (session.isManagement ? fetchRequests({ status: 'PENDING', pageSize: 1 }) : Promise.resolve(null)),
-    [session.isManagement],
+  const canDecide = session.isManagement || session.isManager
+  const pending = useResource(
+    () => (canDecide ? fetchRequests({ status: 'PENDING', pageSize: 1, myTeamOnly: !session.isManagement }) : Promise.resolve(null)),
+    [canDecide],
   )
 
-  const navigate = (id) => {
-    setPage(id)
-    setMobileNavOpen(false)
-    setNotificationsOpen(false)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  const navigate = useCallback(
+    (id, param) => {
+      route.navigate(id, param)
+      setMobileNavOpen(false)
+      setNotificationsOpen(false)
+      window.scrollTo({ top: 0 })
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [route.navigate],
+  )
 
   const markEveryNotificationRead = async () => {
     try {
@@ -137,35 +143,28 @@ function Workspace({ session }) {
     }
   }
 
-  const selectNotification = async (item) => {
-    if (!item.isRead) {
+  const selectNotification = async (entry) => {
+    if (!entry.isRead) {
       try {
-        await markNotificationRead(item.id)
+        await markNotificationRead(entry.id)
         notifications.reload()
       } catch {
         // Navigation is still useful even when read-state persistence fails.
       }
     }
-    if (item.entityType === 'Request') {
-      navigate(session.role === 'admin' ? 'requests' : 'my-requests')
-    } else if (session.role === 'employee' && item.entityType === 'Document') {
-      navigate('profile')
-    } else if (session.role === 'admin' && item.entityType === 'Employee') {
-      navigate('people')
-    } else {
-      setNotificationsOpen(false)
-    }
+    const target = notificationTarget(entry, session)
+    if (target && allowed.has(target)) navigate(target)
+    else setNotificationsOpen(false)
   }
 
-  const meta = PAGE_META[page] ?? ['People Hub', '']
-  const user = session.employee
+  const crumb = locatePage(session, page)
+  const PageComponent = PAGE_COMPONENTS[page]
 
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <div className="grain" aria-hidden="true" />
 
       <Sidebar
         session={session}
@@ -175,43 +174,43 @@ function Workspace({ session }) {
         onSecurity={() => setSecurityOpen(true)}
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
-        pendingCount={pendingBadge.data?.summary?.PENDING ?? 0}
+        pendingCount={pending.data?.summary?.PENDING ?? 0}
       />
 
       <div className="workspace">
         <header className="topbar">
           <button className="mobile-menu" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
-            <Menu size={22} />
+            <Menu size={20} />
           </button>
-          <div className="page-title">
-            <p className="eyebrow">{formatDate(new Date())}</p>
-            <h1>
-              {page === 'overview' || page === 'home'
-                ? `${greeting()}, ${user?.firstName ?? 'there'}`
-                : meta[0]}
-            </h1>
-            <span>{meta[1]}</span>
-          </div>
+          {page === 'dashboard' || page === 'home' ? (
+            <div className="topbar-title">
+              <h1>{`${greeting()}, ${session.employee?.firstName ?? 'there'}`}</h1>
+              <p>{formatDate(new Date(), { weekday: 'long' })}</p>
+            </div>
+          ) : (
+            // Pages carry their own heading and description; the sticky bar
+            // keeps the reader oriented once that heading has scrolled away.
+            <nav className="topbar-title breadcrumb" aria-label="Breadcrumb">
+              {crumb.group && (
+                <>
+                  <span>{crumb.group}</span>
+                  <ChevronRight size={14} aria-hidden="true" />
+                </>
+              )}
+              <h1>{crumb.label}</h1>
+            </nav>
+          )}
           <div className="topbar-actions">
-            <button
-              className="topbar-search"
-              aria-label="Open search"
-              onClick={() => navigate(session.role === 'admin' ? 'people' : 'my-requests')}
-            >
-              <Search size={18} />
-              <span>Search workspace</span>
-              <kbd>⌘ K</kbd>
-            </button>
+            {session.employee && <ClockButton onToast={showToast} />}
             <button
               className="notification-button"
               aria-label="Notifications"
               aria-expanded={notificationsOpen}
               onClick={() => setNotificationsOpen((open) => !open)}
             >
-              <Bell size={19} />
+              <Bell size={18} />
               {(notifications.data?.unreadCount ?? 0) > 0 && <i />}
             </button>
-            <Avatar employee={user} size="sm" />
             {notificationsOpen && (
               <NotificationsPopover
                 state={notifications}
@@ -224,23 +223,17 @@ function Workspace({ session }) {
         </header>
 
         <main id="main-content" className="main-content">
-          {session.role === 'admin' && page === 'overview' && (
-            <AdminOverview onNavigate={navigate} onToast={showToast} onDecided={pendingBadge.reload} />
+          {PageComponent && (
+            <PageComponent
+              key={page}
+              session={session}
+              page={page}
+              param={route.param}
+              navigate={navigate}
+              onToast={showToast}
+              onPendingChanged={pending.reload}
+            />
           )}
-          {session.role === 'admin' && page === 'people' && <PeopleDirectory onToast={showToast} />}
-          {session.role === 'admin' && page === 'requests' && (
-            <AdminRequests onToast={showToast} onDecided={pendingBadge.reload} />
-          )}
-          {session.role === 'admin' && page === 'entities' && <EntitiesPage />}
-
-          {session.role === 'employee' && page === 'home' && (
-            <EmployeeHome session={session} onNavigate={navigate} onToast={showToast} />
-          )}
-          {session.role === 'employee' && page === 'profile' && (
-            <EmployeeProfile session={session} onToast={showToast} />
-          )}
-          {session.role === 'employee' && page === 'my-requests' && <EmployeeRequests onToast={showToast} />}
-          {session.isManager && page === 'my-team' && <ManagerTeam session={session} onToast={showToast} />}
         </main>
       </div>
 
@@ -255,73 +248,95 @@ function Workspace({ session }) {
   )
 }
 
+function notificationTarget(entry, session) {
+  const management = session.isManagement
+  switch (entry.entityType) {
+    case 'Request':
+      return management || (session.isManager && entry.type === 'REQUEST_SUBMITTED') ? 'requests' : 'my-requests'
+    case 'SalaryAdvance':
+      return management ? 'advances' : 'my-pay'
+    case 'PayrollPeriod':
+      return 'my-pay'
+    case 'Document':
+      return management ? 'documents' : 'my-documents'
+    case 'AttendanceRecord':
+      return 'my-attendance'
+    case 'OvertimeEntry':
+      return management || session.isManager ? 'overtime' : 'my-attendance'
+    case 'Employee':
+      return management ? 'employees' : 'my-profile'
+    default:
+      return null
+  }
+}
+
 function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClose, pendingCount }) {
+  const { company, companyName } = useCompany()
+  const groups = navigationFor(session)
   const user = session.employee
-  const items = navFor(session)
+  const logo = company?.company?.logoUrl
 
   return (
     <>
       {open && <button className="nav-scrim" aria-label="Close navigation" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
         <div className="sidebar-head">
-          <div className="brand brand-light">
+          <span className="brand">
             <BrandMark />
-            <span>People Hub</span>
-          </div>
+            <span>
+              Pollux HR
+              <small>People &amp; payroll</small>
+            </span>
+          </span>
           <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">
             <X size={20} />
           </button>
         </div>
 
-        <div className="workspace-chip">
-          <span className="workspace-logo">M</span>
+        <div className="company-chip">
+          {logo ? <img src={logo} alt="" /> : <span className="company-logo">P</span>}
           <span>
-            <strong>Matajer Group</strong>
-            {/* A scoped HR admin sees only one entity, so the chip says so. */}
-            <small>{session.scopedLegalEntityId ? 'Entity-scoped access' : 'People workspace'}</small>
+            <strong>{companyName}</strong>
+            <small>{company?.company ? `${company.company.city}, ${company.company.countryName}` : 'Dubai, UAE'}</small>
           </span>
-          <ChevronDown size={15} />
         </div>
 
         <nav className="primary-nav" aria-label="Primary navigation">
-          <p className="nav-label">{session.role === 'admin' ? 'Management' : 'My workspace'}</p>
-          {items.map((item) => {
-            const Icon = item.icon
-            return (
-              <button
-                className={page === item.id ? 'active' : ''}
-                onClick={() => onNavigate(item.id)}
-                key={item.id}
-                aria-current={page === item.id ? 'page' : undefined}
-              >
-                <Icon size={19} />
-                <span>{item.label}</span>
-                {item.id === 'requests' && pendingCount > 0 && <b>{pendingCount}</b>}
-              </button>
-            )
-          })}
+          {groups.map((group, index) => (
+            <div className="nav-group" key={group.label ?? `group-${index}`}>
+              {group.label && <p className="nav-label">{group.label}</p>}
+              {group.items.map((entry) => {
+                const Icon = entry.icon
+                return (
+                  <button
+                    className={page === entry.id ? 'active' : ''}
+                    onClick={() => onNavigate(entry.id)}
+                    key={entry.id}
+                    aria-current={page === entry.id ? 'page' : undefined}
+                  >
+                    <Icon size={18} />
+                    <span>{entry.label}</span>
+                    {entry.id === 'requests' && pendingCount > 0 && <b>{pendingCount}</b>}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-fill" />
-
-        <div className="role-chip">
-          <div>
-            <span>Signed in as</span>
-            <strong>{formatRole(session.apiRole)}</strong>
-          </div>
-          <button onClick={onSecurity} aria-label="Account security" title="Account security">
-            <KeyRound size={15} />
-          </button>
-        </div>
 
         <div className="sidebar-user">
           <Avatar employee={user} size="sm" />
           <span>
             <strong>{user?.fullName ?? session.email}</strong>
-            <small>{user?.role ?? formatRole(session.apiRole)}</small>
+            <small>{formatRole(session.apiRole)}</small>
           </span>
-          <button onClick={onLogout} aria-label="Sign out">
-            <LogOut size={18} />
+          <button onClick={onSecurity} aria-label="Account security" title="Change password">
+            <KeyRound size={16} />
+          </button>
+          <button onClick={onLogout} aria-label="Sign out" title="Sign out">
+            <LogOut size={16} />
           </button>
         </div>
       </aside>
@@ -336,10 +351,7 @@ function NotificationsPopover({ state, onSelect, onMarkAll, onClose }) {
   return (
     <section className="notification-popover" aria-label="Notifications">
       <header>
-        <div>
-          <p className="eyebrow">Inbox</p>
-          <h2>Notifications</h2>
-        </div>
+        <h2>Notifications</h2>
         <button className="icon-button" onClick={onClose} aria-label="Close notifications">
           <X size={17} />
         </button>
@@ -348,15 +360,13 @@ function NotificationsPopover({ state, onSelect, onMarkAll, onClose }) {
       {state.error && <p className="notification-error">{state.error.message}</p>}
       {!state.loading && !state.error && (
         <div className="notification-list">
-          {items.slice(0, 8).map((item) => (
-            <button className={item.isRead ? '' : 'unread'} key={item.id} onClick={() => onSelect(item)}>
-              <span className="notification-item-icon">
-                {item.isRead ? <CheckCircle2 size={16} /> : <Bell size={16} />}
-              </span>
+          {items.slice(0, 10).map((entry) => (
+            <button className={entry.isRead ? '' : 'unread'} key={entry.id} onClick={() => onSelect(entry)}>
+              <span className="notification-item-icon">{entry.isRead ? <CheckCircle2 size={16} /> : <Bell size={16} />}</span>
               <span>
-                <strong>{item.title}</strong>
-                <small>{item.body}</small>
-                <time>{formatDate(item.createdAt, { year: undefined })}</time>
+                <strong>{entry.title}</strong>
+                <small>{entry.body}</small>
+                <time>{formatDate(entry.createdAt, { year: undefined })}</time>
               </span>
             </button>
           ))}
@@ -364,14 +374,16 @@ function NotificationsPopover({ state, onSelect, onMarkAll, onClose }) {
             <div className="notification-empty">
               <CheckCircle2 size={22} />
               <strong>You’re all caught up</strong>
-              <p>New request decisions and HR updates will appear here.</p>
+              <p>Decisions, payslips and HR updates will appear here.</p>
             </div>
           )}
         </div>
       )}
       {unread > 0 && (
         <footer>
-          <button className="text-button" onClick={onMarkAll}>Mark all {unread} as read</button>
+          <button className="text-button" onClick={onMarkAll}>
+            Mark all {unread} as read
+          </button>
         </footer>
       )}
     </section>
@@ -416,21 +428,25 @@ function ChangePasswordModal({ open, forced, onClose, onComplete }) {
       open={open}
       onClose={onClose}
       dismissible={!forced && !complete}
-      title={complete ? 'Password updated' : forced ? 'Set a new password' : 'Account security'}
-      eyebrow={forced ? 'Required before continuing' : 'Secure your account'}
+      title={complete ? 'Password updated' : forced ? 'Set a new password' : 'Change password'}
+      eyebrow={forced ? 'Required before continuing' : 'Account security'}
     >
       {complete ? (
         <div className="password-success">
-          <span><CheckCircle2 size={24} /></span>
+          <span>
+            <CheckCircle2 size={24} />
+          </span>
           <h3>Your password has been changed.</h3>
-          <p>All refresh sessions were revoked by the server. Sign in again with your new password to continue.</p>
-          <button className="button button-primary button-wide" onClick={onComplete}>Return to sign in</button>
+          <p className="muted">All other sessions were signed out. Sign in again with your new password.</p>
+          <button className="button button-primary button-wide" onClick={onComplete}>
+            Return to sign in
+          </button>
         </div>
       ) : (
         <form className="simple-form" onSubmit={submit} noValidate>
           <div className="security-callout">
-            <KeyRound size={19} />
-            <p>Use at least 10 characters with an uppercase letter, lowercase letter, and number.</p>
+            <KeyRound size={18} />
+            <p>Use at least 10 characters with an uppercase letter, a lowercase letter and a number.</p>
           </div>
           <FormField label="Current password" error={error?.fieldError?.('currentPassword')}>
             <input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(event) => set('currentPassword', event.target.value)} required />
@@ -443,7 +459,11 @@ function ChangePasswordModal({ open, forced, onClose, onComplete }) {
           </FormField>
           <FormError error={error} />
           <div className="form-actions">
-            {!forced && <button type="button" className="button button-ghost" onClick={onClose}>Cancel</button>}
+            {!forced && (
+              <button type="button" className="button button-ghost" onClick={onClose}>
+                Cancel
+              </button>
+            )}
             <button className="button button-primary" type="submit" disabled={saving}>
               {saving ? <Spinner size={16} /> : <KeyRound size={16} />} Change password
             </button>
@@ -454,7 +474,7 @@ function ChangePasswordModal({ open, forced, onClose, onComplete }) {
   )
 }
 
-function formatRole(role) {
+export function formatRole(role) {
   return { ADMIN: 'Administrator', HR_ADMIN: 'HR admin', MANAGER: 'Manager', EMPLOYEE: 'Employee' }[role] ?? role
 }
 

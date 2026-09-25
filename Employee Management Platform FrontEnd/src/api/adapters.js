@@ -36,9 +36,17 @@ export const EMPLOYMENT_TYPE_LABELS = {
 }
 
 export const WORK_MODE_LABELS = {
-  ONSITE: 'On-site',
+  ONSITE: 'Office',
   HYBRID: 'Hybrid',
   REMOTE: 'Remote',
+  FIELD: 'Field',
+}
+
+export const WORK_LOCATION_KIND_LABELS = {
+  OFFICE: 'Office',
+  REMOTE: 'Remote',
+  FIELD: 'Field',
+  OTHER: 'Other',
 }
 
 export const CONTRACT_TYPE_LABELS = {
@@ -196,10 +204,28 @@ export function adaptEmployee(raw) {
     // fell back to a hardcoded 'ONSITE', silently overwriting REMOTE/HYBRID on
     // every unrelated save.
     workModeValue: raw.workMode,
-    location: raw.legalEntity?.name ?? '',
+    location: raw.workLocation?.name ?? '',
 
     managerId: raw.manager?.id ?? null,
     managerName: raw.manager?.fullName ?? null,
+
+    // Where and when they work. Location is directory-level; the schedule,
+    // calendar and timezone come with MANAGER level and above.
+    workLocationId: raw.workLocation?.id ?? null,
+    workLocationName: raw.workLocation?.name ?? null,
+    workLocationKind: raw.workLocation?.kind ?? null,
+    workScheduleId: raw.workSchedule?.id ?? null,
+    workScheduleName: raw.workSchedule?.name ?? null,
+    holidayCalendarId: raw.holidayCalendar?.id ?? null,
+    holidayCalendarName: raw.holidayCalendar?.name ?? null,
+    workCountryCode: raw.workCountryCode,
+    workCountry: raw.workCountry,
+    workCity: raw.workCity,
+    timezone: raw.timezone,
+    effectiveTimezone: raw.effectiveTimezone,
+    overtimeEligible: raw.overtimeEligible,
+    attendanceTracked: raw.attendanceTracked,
+    capabilities: raw.capabilities ?? null,
 
     viewLevel: raw.viewLevel ?? 'DIRECTORY',
     directReportCount: raw.directReportCount ?? 0,
@@ -219,6 +245,7 @@ export function adaptEmployee(raw) {
     personalEmail: raw.personalEmail,
     dateOfBirth: raw.dateOfBirth,
     gender: raw.gender,
+    preferredName: raw.preferredName,
     nationality: raw.nationality,
     address,
     addressLine: raw.address?.line,
@@ -345,6 +372,8 @@ export function adaptLeaveBalance(raw) {
     isPaid: raw.leaveType?.isPaid ?? true,
     allowsHalfDay: raw.leaveType?.allowsHalfDay ?? true,
     entitled: Number(raw.totalEntitlement ?? 0),
+    entitledDays: Number(raw.entitledDays ?? 0),
+    carriedOverDays: Number(raw.carriedOverDays ?? 0),
     used: Number(raw.usedDays ?? 0),
     pending: Number(raw.pendingDays ?? 0),
     available: Number(raw.availableDays ?? 0),
@@ -392,9 +421,9 @@ export function adaptTimeline(list = []) {
 const MANAGEMENT_ROLES = new Set(['ADMIN', 'HR_ADMIN'])
 
 /**
- * The UI has two shells. ADMIN and HR_ADMIN get the management workspace;
- * MANAGER and EMPLOYEE get self-service. A MANAGER still sees their team's
- * requests, because the API decides that server-side on /requests.
+ * One shell, navigation by role. ADMIN and HR_ADMIN manage the company;
+ * MANAGER gets self-service plus their team; EMPLOYEE gets self-service. The
+ * flags only shape the navigation - every rule is enforced by the API.
  */
 export function adaptSession(profile) {
   const role = profile.user.role
@@ -404,6 +433,7 @@ export function adaptSession(profile) {
     role: MANAGEMENT_ROLES.has(role) ? 'admin' : 'employee',
     apiRole: role,
     isManagement: MANAGEMENT_ROLES.has(role),
+    isAdmin: role === 'ADMIN',
     isManager: role === 'MANAGER',
     scopedLegalEntityId: profile.user.scopedLegalEntityId ?? null,
     mustChangePassword: profile.user.mustChangePassword,
@@ -423,6 +453,7 @@ export function adaptSession(profile) {
           entityName: profile.employee.legalEntity?.name ?? '',
           currency: profile.employee.legalEntity?.currency ?? '',
           managerName: profile.employee.manager?.fullName ?? null,
+          workLocationName: profile.employee.workLocation?.name ?? null,
         }
       : null,
   }
