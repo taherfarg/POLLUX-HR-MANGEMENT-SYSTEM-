@@ -1,8 +1,12 @@
-# Render Blueprint for the Employee Management Platform.
+# Render Blueprint for Pollux HR.
 #
 # Deploys two services from this one repository:
-#   - ems-api    the Express API, built from the backend Dockerfile
-#   - ems-web    the React frontend, built by Vite and served as a static site
+#   - pollux-hr-api    the Express API, built from the backend Dockerfile
+#   - pollux-hr-web    the React frontend, built by Vite and served as a static site
+#
+# The names differ from the original Matajer blueprint on `main` (ems-api,
+# ems-web) on purpose: a Blueprint created from this branch creates new services
+# and can never take over, redeploy or overwrite the live Matajer demo.
 #
 # The database is NOT defined here. Render's own Postgres expires on the free
 # plan, so the database lives on Neon (free, no expiry) and is supplied through
@@ -12,11 +16,12 @@
 # API and the database on the same continent matters: every request makes
 # several round trips, and a cross-hemisphere hop shows up as visible lag.
 #
-# Apply with: Render Dashboard -> New -> Blueprint -> point at this repository.
+# Apply with: Render Dashboard -> New -> Blueprint -> this repository, and pick
+# the Pollux HR branch (not main).
 
 services:
   - type: web
-    name: ems-api
+    name: pollux-hr-api
     runtime: docker
     plan: free
     region: singapore
@@ -45,7 +50,7 @@ services:
       - key: JWT_REFRESH_TTL_DAYS
         value: 7
       # Set after the first deploy to the frontend's full origin, including the
-      # scheme: https://ems-web.onrender.com
+      # scheme: https://pollux-hr-web.onrender.com
       #
       # Deliberately not wired with `fromService` - that yields a bare hostname
       # with no scheme, which would not match the browser's Origin header and
@@ -62,7 +67,7 @@ services:
         sync: false
 
   - type: web
-    name: ems-web
+    name: pollux-hr-web
     runtime: static
     # No `plan` here on purpose: static sites are always free and Render rejects
     # a plan field on them ("no such plan free for service type web").
@@ -72,7 +77,7 @@ services:
     envVars:
       # Baked into the bundle at build time, so the frontend calls the deployed
       # API instead of the Vite dev proxy. Set after the first deploy to the
-      # API's full base path: https://ems-api.onrender.com/api/v1
+      # API's full base path: https://pollux-hr-api.onrender.com/api/v1
       - key: VITE_API_URL
         sync: false
     routes:

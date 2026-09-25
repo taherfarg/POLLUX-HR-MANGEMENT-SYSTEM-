@@ -1,6 +1,12 @@
 # Deployment — Render + Neon
 
-Gets the platform to a public URL in about fifteen minutes, on free tiers only. No card required.
+Gets Pollux HR to a public URL in about fifteen minutes, on free tiers only. No card required.
+
+> **Deploying next to the Matajer demo.** The blueprint on this branch creates its own
+> services, `pollux-hr-api` and `pollux-hr-web`, so it can never touch the original
+> `ems-api` / `ems-web` deployment from `main`. Two things keep them apart:
+> choose **this branch** (not `main`) when creating the Blueprint, and give Pollux
+> **its own database** — the seed replaces all demo data in the database it runs against.
 
 **Why this split:** Render's own Postgres expires after 30 days on the free plan, which would take the demo down mid-assessment. Neon's free Postgres has no expiry, so the database lives there and Render runs only the two services.
 
@@ -28,7 +34,7 @@ Then push to a new GitHub repository.
 
 ## 1. Database on Neon (3 min)
 
-1. Sign up at [neon.tech](https://neon.tech) and create a project — pick the region closest to Render's (Frankfurt).
+1. Sign up at [neon.tech](https://neon.tech) and create a project (or a new database in an existing one — never the Matajer demo's) in the region closest to the Render region in `render.yaml` (Singapore, `ap-southeast-1`).
 2. Copy the **pooled** connection string. It looks like:
    ```
    postgresql://user:pass@ep-xxx-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require
@@ -40,8 +46,8 @@ Then push to a new GitHub repository.
 ## 2. Services on Render (5 min)
 
 1. Sign up at [render.com](https://render.com) and connect the GitHub repository.
-2. **New → Blueprint**, select the repo. Render reads `render.yaml` and proposes `ems-api` and `ems-web`.
-3. Render will prompt for the values marked `sync: false`. Set on **ems-api**:
+2. **New → Blueprint**, select the repo and the Pollux HR branch. Render reads `render.yaml` and proposes `pollux-hr-api` and `pollux-hr-web`.
+3. Render will prompt for the values marked `sync: false`. Set on **pollux-hr-api**:
 
    | Variable | Value |
    |---|---|
@@ -60,13 +66,13 @@ Then push to a new GitHub repository.
 
 Once both services are live, Render gives you two URLs. Wire them to each other:
 
-- On **ems-api** → Environment → set `CORS_ORIGINS` to the frontend origin, with the scheme and no trailing slash:
+- On **pollux-hr-api** → Environment → set `CORS_ORIGINS` to the frontend origin, with the scheme and no trailing slash:
   ```
-  https://ems-web.onrender.com
+  https://pollux-hr-web.onrender.com
   ```
-- On **ems-web** → Environment → set `VITE_API_URL` to the API base path:
+- On **pollux-hr-web** → Environment → set `VITE_API_URL` to the API base path:
   ```
-  https://ems-api.onrender.com/api/v1
+  https://pollux-hr-api.onrender.com/api/v1
   ```
 
 Redeploy both. `VITE_API_URL` is baked in at build time, so the frontend **must** be rebuilt after setting it.
@@ -102,7 +108,7 @@ discards anything created during evaluation.
 ## 5. Verify
 
 ```bash
-curl https://ems-api.onrender.com/health
+curl https://pollux-hr-api.onrender.com/health
 ```
 
 Expect `{"status":"ok",...,"database":"connected"}`.
@@ -126,7 +132,7 @@ This matters for an assessment, because an evaluator opening a cold link may ass
 
 1. **Say so in the submission** — one line: "first load may take ~50s if the service has been idle." Costs nothing, sets expectations.
 2. **Keep it warm** — a free [cron-job.org](https://cron-job.org) job hitting `/health` every 10 minutes. Simplest reliable fix.
-3. **Upgrade ems-api to Starter ($7/month)** — no sleeping at all. Within the assessment's $200 budget.
+3. **Upgrade pollux-hr-api to Starter ($7/month)** — no sleeping at all. Within the assessment's $200 budget.
 
 Option 2 is what I would do: free, and the evaluator never sees a cold start.
 
@@ -136,7 +142,7 @@ Option 2 is what I would do: free, and the evaluator never sees a cold start.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Login fails, console shows a CORS error | `CORS_ORIGINS` missing the scheme, or has a trailing slash | Must be exactly `https://ems-web.onrender.com` |
+| Login fails, console shows a CORS error | `CORS_ORIGINS` missing the scheme, or has a trailing slash | Must be exactly `https://pollux-hr-web.onrender.com` |
 | Frontend calls `localhost:4000` | `VITE_API_URL` set after the build | Set it, then **Manual Deploy → Clear build cache & deploy** |
 | API starts then exits | `DATABASE_URL` unreachable or wrong | Check the Neon string is the **pooled** one and includes `?sslmode=require` |
 | `Refusing to start in production with the development JWT secrets` | Secrets were copied from `.env.example` | Let Render generate them, or set 32+ character random values |
