@@ -9,6 +9,8 @@ import { getLeaveBalances } from '../leave/leave.service';
 import { getDirectReports, getEmployee, getEmployeeTimeline } from '../employees/employees.service';
 import { listRequests } from '../requests/requests.service';
 import { requestQuerySchema } from '../requests/requests.schema';
+import { getMyToday, getTimesheet } from '../attendance/attendance.service';
+import { timesheetQuerySchema } from '../attendance/attendance.schema';
 
 export const meRouter: Router = Router();
 
@@ -87,5 +89,23 @@ meRouter.get(
   asyncHandler(async (req: Request, res: Response) => {
     const auth = requireAuth(req);
     sendData(res, await getDirectReports(selfEmployeeId(req), auth));
+  }),
+);
+
+/** The caller's own attendance for a range (defaults to this month). */
+meRouter.get(
+  '/attendance',
+  asyncHandler(async (req: Request, res: Response) => {
+    const auth = requireAuth(req);
+    const query = parseQuery(req, timesheetQuerySchema);
+    // Forced to the caller's own employee id regardless of what was passed in.
+    sendData(res, await getTimesheet(auth, { ...query, employeeId: selfEmployeeId(req) }));
+  }),
+);
+
+meRouter.get(
+  '/attendance/today',
+  asyncHandler(async (req: Request, res: Response) => {
+    sendData(res, await getMyToday(requireAuth(req)));
   }),
 );

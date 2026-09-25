@@ -165,6 +165,114 @@ enum NotificationType {
   DOCUMENT_ISSUED
   PROFILE_UPDATED
   WELCOME
+  ATTENDANCE_UPDATED
+  PAYSLIP_ISSUED
+}
+
+/// Outcome of a working day, as evaluated from the schedule, the check-in and
+/// check-out, approved leave and holidays.
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+  HOLIDAY
+  WEEKEND
+  PARTIAL
+  MISSING_CHECKOUT
+}
+
+enum AttendanceSource {
+  WEB
+  MOBILE
+  MANUAL // entered or corrected by HR
+  SYSTEM
+}
+
+/// What the day was planned to be, independent of what happened.
+enum AttendanceDayType {
+  WORKING_DAY
+  WEEKEND // a rest day in the employee's schedule
+  HOLIDAY
+  LEAVE // approved full-day leave
+}
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum OvertimeSource {
+  ATTENDANCE // calculated from a check-out after the scheduled end
+  MANUAL // entered by HR
+}
+
+enum SalaryAdvanceStatus {
+  PENDING // requested, awaiting HR
+  APPROVED // approved with a repayment plan, not yet paid out
+  REJECTED
+  PAID // money handed to the employee, no instalment deducted yet
+  ACTIVE // repayment in progress
+  COMPLETED // fully repaid
+  CANCELLED
+}
+
+enum AdvanceInstallmentStatus {
+  SCHEDULED
+  DEDUCTED
+  CANCELLED
+}
+
+enum PayrollStatus {
+  DRAFT
+  CALCULATED
+  REVIEWED
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum PayrollItemKind {
+  EARNING
+  DEDUCTION
+}
+
+enum PayrollItemType {
+  BASIC_SALARY
+  HOUSING_ALLOWANCE
+  TRANSPORT_ALLOWANCE
+  OTHER_ALLOWANCE
+  OVERTIME
+  BONUS
+  COMMISSION
+  ALLOWANCE
+  OTHER_EARNING
+  ADVANCE_DEDUCTION
+  UNPAID_LEAVE
+  ABSENCE
+  LATE_DEDUCTION
+  OTHER_DEDUCTION
+}
+
+enum PayrollAdjustmentType {
+  BONUS
+  COMMISSION
+  ALLOWANCE
+  DEDUCTION
+  ABSENCE
+  UNPAID_LEAVE
+  ADVANCE
+  OVERTIME
+  OTHER
+}
+
+enum PayrollAdjustmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
 enum AuditAction {
@@ -222,6 +330,7 @@ model LegalEntity {
   workLocations    WorkLocation[]
   workSchedules    WorkSchedule[]
   holidayCalendars HolidayCalendar[]
+  payrollPeriods   PayrollPeriod[]
 
   @@map("legal_entities")
 }
@@ -478,6 +587,11 @@ model Employee {
   documents        Document[]
   leaveBalances    LeaveBalance[]
   requests         Request[]
+  attendance         AttendanceRecord[]
+  overtimeEntries    OvertimeEntry[]
+  salaryAdvances     SalaryAdvance[]
+  payrollRecords     PayrollRecord[]
+  payrollAdjustments PayrollAdjustment[]
 
   @@index([legalEntityId])
   @@index([departmentId])
@@ -613,10 +727,29 @@ model Document {
 
   employee         Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   issuedForRequest DocumentRequestDetail? @relation("IssuedDocument")
+  file             DocumentFile?
+  payslipFor       PayrollRecord?         @relation("PayslipDocument")
 
   @@index([employeeId])
   @@index([expiresOn])
   @@map("documents")
+}
+
+/// The bytes of a document generated or stored by the platform (payslip PDFs).
+/// Kept out of the `documents` table so listing documents never loads files.
+model DocumentFile {
+  id         String   @id @default(cuid())
+  documentId String   @unique
+  data       Bytes
+  mimeType   String
+  sizeBytes  Int
+  /// SHA-256 of the bytes, so a stored payslip can be shown to be unaltered.
+  sha256     String
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_files")
 }
 
 // ---------------------------------------------------------------------------
@@ -695,6 +828,322 @@ model LeaveBalance {
   @@unique([employeeId, leaveTypeId, year])
   @@index([employeeId, year])
   @@map("leave_balances")
+}
+
+// ---------------------------------------------------------------------------
+// Attendance and overtime
+// ---------------------------------------------------------------------------
+
+/// One employee, one local calendar day.
+///
+/// Instants (check-in, check-out, scheduled start/end) are stored in UTC. The
+/// day they belong to (`workDate`) and whether someone was late are derived in
+/// `timezone`, which is recorded on the row so the record keeps meaning even if
+/// the employee later moves zone. The schedule figures are a snapshot of the
+/// schedule in force when the day was recorded.
+///
+/// Days with no event (an absence, a weekend, a holiday) are not stored: the
+/// service evaluates them on read from the schedule, leave and holidays. A row
+/// exists when something happened - a check-in, or an HR entry.
+model AttendanceRecord {
+  id                String            @id @default(cuid())
+  employeeId        String
+  /// Snapshot of the employee legal entity, for scoping and reporting.
+  legalEntityId     String
+  workDate          DateTime          @db.Date
+  timezone          String
+  checkIn           DateTime?         @db.Timestamptz(3)
+  checkOut          DateTime?         @db.Timestamptz(3)
+  checkInSource     AttendanceSource?
+  checkOutSource    AttendanceSource?
+  dayType           AttendanceDayType @default(WORKING_DAY)
+  scheduleId        String?
+  scheduledStart    DateTime?         @db.Timestamptz(3)
+  scheduledEnd      DateTime?         @db.Timestamptz(3)
+  scheduledMinutes  Int               @default(0)
+  breakMinutes      Int               @default(0)
+  workedMinutes     Int               @default(0)
+  lateMinutes       Int               @default(0)
+  earlyLeaveMinutes Int               @default(0)
+  overtimeMinutes   Int               @default(0)
+  /// 1 for an unexcused absent working day, 0.5 when half the day was leave.
+  absentDays        Decimal           @default(0) @db.Decimal(3, 2)
+  status            AttendanceStatus
+  /// True when HR set the status explicitly rather than letting it be derived.
+  statusOverridden  Boolean           @default(false)
+  source            AttendanceSource  @default(WEB)
+  notes             String?
+  isManual          Boolean           @default(false)
+  correctedById     String?
+  correctedAt       DateTime?
+  correctionReason  String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  employee      Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  overtimeEntry OvertimeEntry?
+
+  @@unique([employeeId, workDate])
+  @@index([workDate])
+  @@index([legalEntityId, workDate])
+  @@index([status, workDate])
+  @@map("attendance_records")
+}
+
+/// Time worked beyond the schedule. Created automatically from attendance or
+/// entered by HR; reaches payroll only once APPROVED (when policy requires it).
+model OvertimeEntry {
+  id             String            @id @default(cuid())
+  employeeId     String
+  legalEntityId  String
+  attendanceId   String?           @unique
+  date           DateTime          @db.Date
+  minutes        Int
+  dayType        AttendanceDayType @default(WORKING_DAY)
+  /// Policy multiplier captured when the entry was created (1.25, 1.5...).
+  rateMultiplier Decimal           @db.Decimal(4, 2)
+  status         OvertimeStatus    @default(PENDING)
+  source         OvertimeSource
+  reason         String?
+  createdById    String?
+  decidedById    String?
+  decidedAt      DateTime?
+  decisionNote   String?
+  /// Set when a payroll consumed this entry; released if that payroll is
+  /// recalculated or cancelled, frozen once it is approved.
+  payrollItemId  String?           @unique
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  employee    Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendance  AttendanceRecord? @relation(fields: [attendanceId], references: [id], onDelete: SetNull)
+  payrollItem PayrollItem?      @relation(fields: [payrollItemId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId, date])
+  @@index([legalEntityId, status, date])
+  @@map("overtime_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Salary advances
+// ---------------------------------------------------------------------------
+
+model SalaryAdvance {
+  id                    String              @id @default(cuid())
+  /// Human-facing, e.g. ADV-2026-0004.
+  reference             String              @unique
+  employeeId            String
+  legalEntityId         String
+  currency              String              @db.Char(3)
+  requestedAmount       Decimal             @db.Decimal(12, 2)
+  /// The employee's preferred number of instalments; HR decides the plan.
+  requestedInstallments Int?
+  approvedAmount        Decimal?            @db.Decimal(12, 2)
+  reason                String
+  requestDate           DateTime            @default(now())
+  /// First day of the first month an instalment is deducted.
+  repaymentStartDate    DateTime?           @db.Date
+  installmentAmount     Decimal?            @db.Decimal(12, 2)
+  numberOfInstallments  Int?
+  /// Approved amount minus instalments already deducted. Kept in step with the
+  /// instalments inside the same transaction that changes them.
+  remainingAmount       Decimal             @default(0) @db.Decimal(12, 2)
+  status                SalaryAdvanceStatus @default(PENDING)
+  createdById           String?
+  approvedById          String?
+  approvedAt            DateTime?
+  rejectedById          String?
+  rejectedAt            DateTime?
+  decisionNote          String?
+  paidAt                DateTime?
+  paidById              String?
+  paymentReference      String?
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  employee     Employee                   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  installments SalaryAdvanceInstallment[]
+
+  @@index([employeeId, status])
+  @@index([legalEntityId, status])
+  @@map("salary_advances")
+}
+
+model SalaryAdvanceInstallment {
+  id            String                   @id @default(cuid())
+  advanceId     String
+  sequence      Int
+  /// First day of the payroll month the instalment is deducted in.
+  dueMonth      DateTime                 @db.Date
+  amount        Decimal                  @db.Decimal(12, 2)
+  status        AdvanceInstallmentStatus @default(SCHEDULED)
+  /// The payroll line that deducts it.
+  payrollItemId String?                  @unique
+  deductedAt    DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  advance     SalaryAdvance @relation(fields: [advanceId], references: [id], onDelete: Cascade)
+  payrollItem PayrollItem?  @relation(fields: [payrollItemId], references: [id], onDelete: SetNull)
+
+  @@unique([advanceId, sequence])
+  @@index([dueMonth, status])
+  @@map("salary_advance_installments")
+}
+
+// ---------------------------------------------------------------------------
+// Payroll
+//
+// CompensationRecord is salary *configuration and history*. Payroll is the
+// separate monthly *financial record*: every figure a payslip shows is copied
+// into PayrollRecord / PayrollItem when the period is calculated, so a
+// historical payroll never changes because someone's salary changed later.
+// ---------------------------------------------------------------------------
+
+model PayrollPeriod {
+  id               String        @id @default(cuid())
+  legalEntityId    String
+  year             Int
+  month            Int
+  name             String
+  startDate        DateTime      @db.Date
+  endDate          DateTime      @db.Date
+  payDate          DateTime?     @db.Date
+  currency         String        @db.Char(3)
+  status           PayrollStatus @default(DRAFT)
+  employeeCount    Int           @default(0)
+  totalGross       Decimal       @default(0) @db.Decimal(14, 2)
+  totalDeductions  Decimal       @default(0) @db.Decimal(14, 2)
+  totalNet         Decimal       @default(0) @db.Decimal(14, 2)
+  notes            String?
+  createdById      String?
+  calculatedAt     DateTime?
+  calculatedById   String?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  approvedAt       DateTime?
+  approvedById     String?
+  paidAt           DateTime?
+  paidById         String?
+  paymentReference String?
+  cancelledAt      DateTime?
+  cancelledById    String?
+  reopenedAt       DateTime?
+  reopenedById     String?
+  reopenReason     String?
+  reopenCount      Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  legalEntity LegalEntity     @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  records     PayrollRecord[]
+
+  @@unique([legalEntityId, year, month])
+  @@index([status])
+  @@map("payroll_periods")
+}
+
+/// One employee in one payroll period - a frozen snapshot.
+model PayrollRecord {
+  id                   String   @id @default(cuid())
+  periodId             String
+  employeeId           String
+  // Identity, as it was when calculated.
+  employeeNumber       String
+  employeeName         String
+  jobTitle             String
+  departmentName       String?
+  workLocationName     String?
+  currency             String   @db.Char(3)
+  /// The compensation record the salary figures were taken from (reference only).
+  compensationRecordId String?
+  // Salary configuration, monthly amounts as configured.
+  baseSalary           Decimal  @db.Decimal(12, 2)
+  housingAllowance     Decimal  @db.Decimal(12, 2)
+  transportAllowance   Decimal  @db.Decimal(12, 2)
+  otherAllowances      Decimal  @db.Decimal(12, 2)
+  // Time basis.
+  periodDays           Int
+  /// Share of the period the employee was employed, e.g. 1.0000 or 0.5000.
+  employedFraction     Decimal  @db.Decimal(6, 4)
+  workingDays          Int
+  absentDays           Decimal  @default(0) @db.Decimal(5, 2)
+  unpaidLeaveDays      Decimal  @default(0) @db.Decimal(5, 2)
+  lateMinutes          Int      @default(0)
+  overtimeMinutes      Int      @default(0)
+  dailyRate            Decimal  @db.Decimal(12, 4)
+  hourlyRate           Decimal  @db.Decimal(12, 4)
+  // Totals: the sum of the rounded line items.
+  grossEarnings        Decimal  @db.Decimal(12, 2)
+  totalDeductions      Decimal  @db.Decimal(12, 2)
+  netSalary            Decimal  @db.Decimal(12, 2)
+  warnings             String[]
+  payslipDocumentId    String?  @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  period          PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  items           PayrollItem[]
+  payslipDocument Document?     @relation("PayslipDocument", fields: [payslipDocumentId], references: [id], onDelete: SetNull)
+
+  @@unique([periodId, employeeId])
+  @@index([employeeId])
+  @@map("payroll_records")
+}
+
+/// One line of a payslip. Amounts are always positive; `kind` says which side.
+model PayrollItem {
+  id        String          @id @default(cuid())
+  recordId  String
+  kind      PayrollItemKind
+  type      PayrollItemType
+  label     String
+  quantity  Decimal?        @db.Decimal(10, 2)
+  rate      Decimal?        @db.Decimal(12, 4)
+  amount    Decimal         @db.Decimal(12, 2)
+  sortOrder Int             @default(0)
+  createdAt DateTime        @default(now())
+
+  record        PayrollRecord             @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  overtimeEntry OvertimeEntry?
+  installment   SalaryAdvanceInstallment?
+  adjustment    PayrollAdjustment?
+
+  @@index([recordId])
+  @@map("payroll_items")
+}
+
+/// A bonus, commission, deduction or other one-off for a payroll month.
+/// Reaches payroll only once APPROVED.
+model PayrollAdjustment {
+  id            String                  @id @default(cuid())
+  employeeId    String
+  legalEntityId String
+  /// First day of the payroll month it belongs to.
+  payrollMonth  DateTime                @db.Date
+  type          PayrollAdjustmentType
+  kind          PayrollItemKind
+  description   String
+  amount        Decimal                 @db.Decimal(12, 2)
+  currency      String                  @db.Char(3)
+  status        PayrollAdjustmentStatus @default(PENDING)
+  createdById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  decisionNote  String?
+  payrollItemId String?                 @unique
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  payrollItem PayrollItem? @relation(fields: [payrollItemId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId, payrollMonth])
+  @@index([legalEntityId, payrollMonth, status])
+  @@map("payroll_adjustments")
 }
 
 // ---------------------------------------------------------------------------
