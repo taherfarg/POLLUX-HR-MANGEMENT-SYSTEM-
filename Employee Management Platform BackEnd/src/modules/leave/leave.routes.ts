@@ -14,6 +14,8 @@ import {
   leaveTypeSchema,
   listHolidays,
   listLeaveTypes,
+  updateHoliday,
+  updateHolidaySchema,
   updateLeaveType,
 } from './leave.service';
 
@@ -31,6 +33,7 @@ const leaveTypeQuerySchema = z.object({
 
 const holidayQuerySchema = z.object({
   legalEntityId: optionalTrimmedString(40),
+  calendarId: optionalTrimmedString(40),
   year: z.coerce.number().int().min(1900).max(2200).optional(),
 });
 
@@ -75,6 +78,16 @@ leaveRouter.post(
   asyncHandler(async (req: Request, res: Response) => {
     const input = parseBody(req, holidaySchema);
     sendCreated(res, await createHoliday(requireAuth(req), input, auditContextFromRequest(req)));
+  }),
+);
+
+leaveRouter.patch(
+  '/holidays/:id',
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = parseParams(req, idParamSchema);
+    const input = parseBody(req, updateHolidaySchema);
+    sendData(res, await updateHoliday(requireAuth(req), id, input, auditContextFromRequest(req)));
   }),
 );
 

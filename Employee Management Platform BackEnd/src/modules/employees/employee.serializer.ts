@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { AuthContext } from '../../common/auth-context';
-import { employeeViewLevel, type EmployeeViewLevel } from '../../services/access';
+import { employeeViewLevel, type EmployeeCapabilities, type EmployeeViewLevel } from '../../services/access';
 import { monthsBetween } from '../../services/working-days';
 
 /**
@@ -13,13 +13,16 @@ import { monthsBetween } from '../../services/working-days';
  */
 
 export const employeeListInclude = {
-  legalEntity: { select: { id: true, code: true, name: true, countryCode: true, currency: true } },
+  legalEntity: { select: { id: true, code: true, name: true, countryCode: true, currency: true, timezone: true } },
   department: { select: { id: true, name: true } },
   manager: { select: { id: true, firstName: true, lastName: true } },
+  workLocation: { select: { id: true, code: true, name: true, kind: true, timezone: true } },
 } satisfies Prisma.EmployeeInclude;
 
 export const employeeDetailInclude = {
   ...employeeListInclude,
+  workSchedule: { select: { id: true, code: true, name: true, timezone: true } },
+  holidayCalendar: { select: { id: true, code: true, name: true } },
   user: { select: { id: true, email: true, role: true, isActive: true, lastLoginAt: true } },
   _count: { select: { directReports: true } },
 } satisfies Prisma.EmployeeInclude;
@@ -59,11 +62,25 @@ function directoryView(employee: EmployeeListRow) {
     workMode: employee.workMode,
     avatarUrl: employee.avatarUrl,
     department: employee.department,
-    legalEntity: employee.legalEntity,
+    legalEntity: {
+      id: employee.legalEntity.id,
+      code: employee.legalEntity.code,
+      name: employee.legalEntity.name,
+      countryCode: employee.legalEntity.countryCode,
+      currency: employee.legalEntity.currency,
+    },
+    workLocation: employee.workLocation
+      ? { id: employee.workLocation.id, code: employee.workLocation.code, name: employee.workLocation.name, kind: employee.workLocation.kind }
+      : null,
     manager: employee.manager
       ? { id: employee.manager.id, fullName: `${employee.manager.firstName} ${employee.manager.lastName}` }
       : null,
   };
+}
+
+/** The zone the employee works in, after the fallbacks. */
+export function effectiveTimezone(employee: EmployeeListRow): string {
+  return employee.timezone ?? employee.workLocation?.timezone ?? employee.legalEntity.timezone;
 }
 
 /**
@@ -81,6 +98,14 @@ function managerView(employee: EmployeeListRow) {
     probationEndDate: toDateOnly(employee.probationEndDate),
     contractEndDate: toDateOnly(employee.contractEndDate),
     noticePeriodDays: employee.noticePeriodDays,
+    // Where a report works matters for planning a team across timezones. For a
+    // remote employee the city is effectively where they live, so it starts at
+    // manager level rather than in the address book.
+    workCountryCode: employee.workCountryCode,
+    workCountry: employee.workCountry,
+    workCity: employee.workCity,
+    timezone: employee.timezone,
+    effectiveTimezone: effectiveTimezone(employee),
   };
 }
 
@@ -136,12 +161,22 @@ export function serializeEmployeeList(
 export function serializeEmployeeDetail(
   employee: EmployeeDetailRow,
   level: EmployeeViewLevel,
-  options: { includeAccount: boolean },
+  options: { includeAccount: boolean; capabilities?: EmployeeCapabilities },
 ): Record<string, unknown> {
   const base = serializeEmployee(employee, level);
   return {
     ...base,
+    // Schedule and holiday calendar are working context (MANAGER and up);
+    // overtime eligibility is an HR employment term (FULL only).
+    ...(level === 'DIRECTORY'
+      ? {}
+      : {
+          workSchedule: employee.workSchedule,
+          holidayCalendar: employee.holidayCalendar,
+        }),
+    ...(level === 'FULL' ? { overtimeEligible: employee.overtimeEligible } : {}),
     directReportCount: employee._count.directReports,
+    capabilities: options.capabilities,
     // The linked login account is management information, not part of the
     // employee's own profile view.
     account: options.includeAccount

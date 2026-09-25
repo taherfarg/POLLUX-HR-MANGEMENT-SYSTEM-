@@ -57,14 +57,14 @@ export function createApp(): Express {
       .then(() => {
         res.json({
           status: 'ok',
-          service: 'ems-api',
+          service: 'pollux-hr-api',
           environment: env.NODE_ENV,
           database: 'connected',
           timestamp: new Date().toISOString(),
         });
       })
       .catch(() => {
-        res.status(503).json({ status: 'degraded', service: 'ems-api', database: 'unreachable' });
+        res.status(503).json({ status: 'degraded', service: 'pollux-hr-api', database: 'unreachable' });
       });
   });
 

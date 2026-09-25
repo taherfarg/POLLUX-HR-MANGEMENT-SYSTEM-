@@ -7,6 +7,8 @@ import type { AuthContext } from '../../common/auth-context';
 import { assertEntityInScope, assertIsManagement, isManagement, scopedEntityId } from '../../services/access';
 import { recordAudit, type AuditInput } from '../../services/audit.service';
 import { countWorkingDays } from '../../services/working-days';
+import { getCompanySettings, resolveLegalEntityId } from '../../services/company';
+import { loadHolidayDates, loadWorkContext, type HolidayEntry } from '../../services/work-context';
 
 type Fingerprint = Pick<AuditInput, 'ipAddress' | 'userAgent'>;
 
@@ -30,12 +32,29 @@ export const leaveTypeSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+/**
+ * `legalEntityId` and `calendarId` are both optional: with neither, the holiday
+ * goes into the primary company's default calendar - the common case for a
+ * single-company deployment. The original entity-only payload still works.
+ */
 export const holidaySchema = z.object({
-  legalEntityId: requiredTrimmedString(1, 40),
+  legalEntityId: optionalTrimmedString(40),
+  calendarId: optionalTrimmedString(40),
   name: requiredTrimmedString(2, 120),
   date: dateStringSchema,
+  type: z.enum(['PUBLIC', 'COMPANY']).default('PUBLIC'),
   isRecurringAnnually: z.boolean().default(false),
 });
+
+export const updateHolidaySchema = z
+  .object({
+    name: requiredTrimmedString(2, 120),
+    date: dateStringSchema,
+    type: z.enum(['PUBLIC', 'COMPANY']),
+    isRecurringAnnually: z.boolean(),
+  })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, { message: 'No fields to update' });
 
 export const calendarQuerySchema = z.object({
   from: dateStringSchema,
@@ -45,6 +64,7 @@ export const calendarQuerySchema = z.object({
 
 export type LeaveTypeInput = z.infer<typeof leaveTypeSchema>;
 export type HolidayInput = z.infer<typeof holidaySchema>;
+export type UpdateHolidayInput = z.infer<typeof updateHolidaySchema>;
 
 function serializeLeaveType(type: {
   id: string;
@@ -151,6 +171,7 @@ export async function createLeaveType(
     action: 'CREATE',
     entityType: 'LeaveType',
     entityId: created.id,
+    legalEntityId: created.legalEntityId,
     summary: `Created leave type ${created.code} (${created.name})`,
     actor: auth,
     ...fingerprint,
@@ -195,6 +216,7 @@ export async function updateLeaveType(
     action: 'UPDATE',
     entityType: 'LeaveType',
     entityId: leaveTypeId,
+    legalEntityId: existing.legalEntityId,
     summary: `Updated leave type ${updated.code}`,
     actor: auth,
     ...fingerprint,
@@ -203,9 +225,26 @@ export async function updateLeaveType(
   return serializeLeaveType(updated);
 }
 
+const holidayInclude = {
+  legalEntity: { select: { id: true, code: true, name: true, countryCode: true } },
+  calendar: { select: { id: true, code: true, name: true } },
+} satisfies Prisma.HolidayInclude;
+
+function serializeHoliday(holiday: Prisma.HolidayGetPayload<{ include: typeof holidayInclude }>) {
+  return {
+    id: holiday.id,
+    name: holiday.name,
+    date: holiday.date.toISOString().slice(0, 10),
+    type: holiday.type,
+    isRecurringAnnually: holiday.isRecurringAnnually,
+    legalEntity: holiday.legalEntity,
+    calendar: holiday.calendar,
+  };
+}
+
 export async function listHolidays(
   auth: AuthContext,
-  filters: { legalEntityId?: string; year?: number },
+  filters: { legalEntityId?: string; calendarId?: string; year?: number },
 ): Promise<unknown[]> {
   const entityId = filters.legalEntityId ?? scopedEntityId(auth) ?? undefined;
   const year = filters.year;
@@ -213,21 +252,70 @@ export async function listHolidays(
   const holidays = await prisma.holiday.findMany({
     where: {
       ...(entityId ? { legalEntityId: entityId } : {}),
+      ...(filters.calendarId ? { calendarId: filters.calendarId } : {}),
       ...(year
         ? { date: { gte: new Date(Date.UTC(year, 0, 1)), lte: new Date(Date.UTC(year, 11, 31)) } }
         : {}),
     },
-    include: { legalEntity: { select: { id: true, code: true, name: true, countryCode: true } } },
+    include: holidayInclude,
     orderBy: { date: 'asc' },
   });
 
-  return holidays.map((holiday) => ({
-    id: holiday.id,
-    name: holiday.name,
-    date: holiday.date.toISOString().slice(0, 10),
-    isRecurringAnnually: holiday.isRecurringAnnually,
-    legalEntity: holiday.legalEntity,
-  }));
+  return holidays.map(serializeHoliday);
+}
+
+/**
+ * The calendar a new holiday belongs to: the one named, else the entity's
+ * default calendar, else its first calendar - and if the entity has none yet,
+ * one is created so the holiday always has a home.
+ */
+async function resolveHolidayCalendar(
+  auth: AuthContext,
+  input: { legalEntityId?: string; calendarId?: string },
+): Promise<{ id: string; legalEntityId: string }> {
+  if (input.calendarId) {
+    const calendar = await prisma.holidayCalendar.findUnique({
+      where: { id: input.calendarId },
+      select: { id: true, legalEntityId: true },
+    });
+    if (!calendar) {
+      throw new ValidationError('Validation failed', { calendarId: ['Holiday calendar does not exist'] });
+    }
+    assertEntityInScope(auth, calendar.legalEntityId);
+    if (input.legalEntityId && input.legalEntityId !== calendar.legalEntityId) {
+      throw new ValidationError('Validation failed', { calendarId: ['This calendar belongs to another company'] });
+    }
+    return calendar;
+  }
+
+  const legalEntityId = await resolveLegalEntityId(auth, input.legalEntityId);
+  assertEntityInScope(auth, legalEntityId);
+
+  const settings = await getCompanySettings(legalEntityId);
+  if (settings.defaultHolidayCalendarId) {
+    return { id: settings.defaultHolidayCalendarId, legalEntityId };
+  }
+
+  const first = await prisma.holidayCalendar.findFirst({
+    where: { legalEntityId },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, legalEntityId: true },
+  });
+  if (first) return first;
+
+  const entity = await prisma.legalEntity.findUniqueOrThrow({
+    where: { id: legalEntityId },
+    select: { code: true, name: true, countryCode: true },
+  });
+  return prisma.holidayCalendar.create({
+    data: {
+      legalEntityId,
+      code: `${entity.code}-HOLIDAYS`,
+      name: `${entity.name} Public Holidays`,
+      countryCode: entity.countryCode,
+    },
+    select: { id: true, legalEntityId: true },
+  });
 }
 
 export async function createHoliday(
@@ -236,27 +324,70 @@ export async function createHoliday(
   fingerprint: Fingerprint,
 ): Promise<unknown> {
   assertIsManagement(auth);
-  assertEntityInScope(auth, input.legalEntityId);
+  const calendar = await resolveHolidayCalendar(auth, input);
 
   const holiday = await prisma.holiday.create({
     data: {
-      legalEntityId: input.legalEntityId,
+      legalEntityId: calendar.legalEntityId,
+      calendarId: calendar.id,
       name: input.name,
       date: toUtcDate(input.date),
+      type: input.type,
       isRecurringAnnually: input.isRecurringAnnually,
     },
+    include: holidayInclude,
   });
 
   await recordAudit({
     action: 'CREATE',
     entityType: 'Holiday',
     entityId: holiday.id,
-    summary: `Added public holiday ${input.name} on ${input.date}`,
+    legalEntityId: holiday.legalEntityId,
+    summary: `Added ${input.type === 'COMPANY' ? 'company' : 'public'} holiday ${input.name} on ${input.date} (${holiday.calendar.name})`,
     actor: auth,
     ...fingerprint,
   });
 
-  return { ...holiday, date: holiday.date.toISOString().slice(0, 10) };
+  return serializeHoliday(holiday);
+}
+
+export async function updateHoliday(
+  auth: AuthContext,
+  holidayId: string,
+  input: UpdateHolidayInput,
+  fingerprint: Fingerprint,
+): Promise<unknown> {
+  assertIsManagement(auth);
+  const existing = await prisma.holiday.findUnique({ where: { id: holidayId } });
+  if (!existing) {
+    throw new NotFoundError('Holiday');
+  }
+  assertEntityInScope(auth, existing.legalEntityId);
+
+  const updated = await prisma.holiday.update({
+    where: { id: holidayId },
+    data: {
+      name: input.name,
+      date: input.date ? toUtcDate(input.date) : undefined,
+      type: input.type,
+      isRecurringAnnually: input.isRecurringAnnually,
+    },
+    include: holidayInclude,
+  });
+
+  await recordAudit({
+    action: 'UPDATE',
+    entityType: 'Holiday',
+    entityId: holidayId,
+    legalEntityId: existing.legalEntityId,
+    summary: `Updated holiday ${updated.name}`,
+    before: { name: existing.name, date: existing.date.toISOString().slice(0, 10), type: existing.type },
+    after: { name: updated.name, date: updated.date.toISOString().slice(0, 10), type: updated.type },
+    actor: auth,
+    ...fingerprint,
+  });
+
+  return serializeHoliday(updated);
 }
 
 export async function deleteHoliday(
@@ -276,6 +407,7 @@ export async function deleteHoliday(
     action: 'DELETE',
     entityType: 'Holiday',
     entityId: holidayId,
+    legalEntityId: holiday.legalEntityId,
     summary: `Removed public holiday ${holiday.name}`,
     actor: auth,
     ...fingerprint,
@@ -283,48 +415,73 @@ export async function deleteHoliday(
 }
 
 /**
- * Converts a date range into chargeable leave days using the employee's own
- * legal entity calendar. Shared by the request validator and by the "preview
- * before you submit" endpoint so the number the employee sees is the number
- * that gets deducted.
+ * Converts a date range into chargeable leave days. Shared by the request
+ * validator and by the "preview before you submit" endpoint so the number the
+ * employee sees is the number that gets deducted.
+ *
+ * With an `employeeId` the calculation is employee-aware: the employee's own
+ * work schedule decides which weekdays are working days (a part-timer on
+ * Mon/Wed/Fri is only charged for those), and their holiday calendar decides
+ * which days are holidays (a remote employee assigned the Egypt calendar skips
+ * Egyptian holidays). With nothing assigned, both fall back to the legal
+ * entity's work week and default calendar - exactly the original behaviour.
  */
 export async function calculateLeaveDays(params: {
   legalEntityId: string;
+  employeeId?: string;
   startDate: Date;
   endDate: Date;
   halfDayStart?: boolean;
   halfDayEnd?: boolean;
 }): Promise<{ workingDays: number; holidays: { date: string; name: string }[] }> {
-  const entity = await prisma.legalEntity.findUnique({
-    where: { id: params.legalEntityId },
-    select: { workWeek: true },
-  });
-  if (!entity) {
-    throw new NotFoundError('Legal entity');
+  let workWeek: number[];
+  let calendarId: string | null;
+
+  if (params.employeeId) {
+    const context = await loadWorkContext(params.employeeId);
+    workWeek = context.workWeek;
+    calendarId = context.holidayCalendarId;
+  } else {
+    const entity = await prisma.legalEntity.findUnique({
+      where: { id: params.legalEntityId },
+      select: { workWeek: true },
+    });
+    if (!entity) {
+      throw new NotFoundError('Legal entity');
+    }
+    workWeek = entity.workWeek;
+    const settings = await getCompanySettings(params.legalEntityId);
+    calendarId =
+      settings.defaultHolidayCalendarId ??
+      (
+        await prisma.holidayCalendar.findFirst({
+          where: { legalEntityId: params.legalEntityId },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        })
+      )?.id ??
+      null;
   }
 
-  const holidays = await prisma.holiday.findMany({
-    where: {
-      legalEntityId: params.legalEntityId,
-      date: { gte: params.startDate, lte: params.endDate },
-    },
-    select: { date: true, name: true },
-    orderBy: { date: 'asc' },
-  });
+  const fromKey = params.startDate.toISOString().slice(0, 10);
+  const toKey = params.endDate.toISOString().slice(0, 10);
+  const holidayMap = calendarId
+    ? ((await loadHolidayDates([calendarId], fromKey, toKey)).get(calendarId) ?? new Map())
+    : new Map<string, HolidayEntry>();
+  const holidays = [...holidayMap.entries()]
+    .map(([date, entry]) => ({ date, name: entry.name }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   const workingDays = countWorkingDays({
     start: params.startDate,
     end: params.endDate,
-    workWeek: entity.workWeek,
-    holidays: holidays.map((holiday) => holiday.date),
+    workWeek,
+    holidays: holidays.map((holiday) => new Date(`${holiday.date}T00:00:00.000Z`)),
     halfDayStart: params.halfDayStart,
     halfDayEnd: params.halfDayEnd,
   });
 
-  return {
-    workingDays,
-    holidays: holidays.map((holiday) => ({ date: holiday.date.toISOString().slice(0, 10), name: holiday.name })),
-  };
+  return { workingDays, holidays };
 }
 
 export async function getLeaveBalances(employeeId: string, year: number): Promise<unknown[]> {

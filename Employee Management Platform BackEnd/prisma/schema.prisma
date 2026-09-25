@@ -1,10 +1,12 @@
-// Employee Management Platform - data model
+// Pollux HR - data model (evolved from the Matajer Employee Management Platform)
 //
 // Design notes worth knowing before reading:
 //
 //  1. LegalEntity is the organisational root. Every employee points at exactly
 //     one, and leave policy, public holidays, working week and currency all hang
-//     off it. Adding a fourth country is inserting a row, not changing code.
+//     off it. Pollux runs as a single company (POLLUX MOTORS FZE), so the UI hides
+//     the multi-entity machinery, but the model keeps it: policy still belongs to
+//     the entity, and a second company would still be inserting a row.
 //
 //  2. User (authentication) is deliberately separate from Employee (HR record).
 //     Not every employee needs a login, and an HR admin need not be an employee.
@@ -17,6 +19,14 @@
 //  4. Requests use a supertype (Request) plus one typed detail table per kind.
 //     The unified admin inbox queries a single table, while leave still gets
 //     real date columns for calendars and balance arithmetic.
+//
+//  5. Where someone works (WorkLocation, timezone) and when they work
+//     (WorkSchedule) are separate from who employs them (LegalEntity). A remote
+//     employee in Cairo is employed by the Dubai company, works Cairo hours and
+//     is never modelled as a fake branch or a fake legal entity.
+//
+//  6. Company policy that drives calculations - grace periods, overtime rules,
+//     payroll day basis - is data (CompanySettings), not constants in code.
 
 generator client {
   provider = "prisma-client-js"
@@ -59,9 +69,36 @@ enum ContractType {
 }
 
 enum WorkMode {
-  ONSITE
+  ONSITE // shown as "Office" in Pollux
   HYBRID
   REMOTE
+  FIELD // on the road or at customer sites
+}
+
+enum WorkLocationKind {
+  OFFICE
+  REMOTE
+  FIELD
+  OTHER
+}
+
+enum HolidayType {
+  PUBLIC // official public holiday
+  COMPANY // company-specific day off
+}
+
+/// How a monthly salary is divided into a daily rate for proration and
+/// day-based deductions.
+enum SalaryDayBasis {
+  FIXED_30 // every month counts as 30 days (UAE practice)
+  CALENDAR_DAYS // the actual number of days in the month
+  WORKING_DAYS // the employee's scheduled working days in the month
+}
+
+/// Which part of the salary a rate is derived from.
+enum PayBase {
+  BASIC // base salary only
+  GROSS // base salary plus fixed allowances
 }
 
 enum Gender {
@@ -142,6 +179,11 @@ enum AuditAction {
   LOGOUT
   PASSWORD_CHANGE
   VIEW_SENSITIVE
+  CALCULATE
+  REVIEW
+  MARK_PAID
+  REOPEN
+  EXPORT
 }
 
 // ---------------------------------------------------------------------------
@@ -171,13 +213,175 @@ model LegalEntity {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  employees   Employee[]
-  leaveTypes  LeaveType[]
-  holidays    Holiday[]
-  requests    Request[]
-  scopedUsers User[]      @relation("UserLegalEntityScope")
+  employees        Employee[]
+  leaveTypes       LeaveType[]
+  holidays         Holiday[]
+  requests         Request[]
+  scopedUsers      User[]            @relation("UserLegalEntityScope")
+  settings         CompanySettings?
+  workLocations    WorkLocation[]
+  workSchedules    WorkSchedule[]
+  holidayCalendars HolidayCalendar[]
 
   @@map("legal_entities")
+}
+
+/// Company-level policy, one row per legal entity. Everything the attendance
+/// and payroll calculations need to know about "how this company works" lives
+/// here rather than as constants in the code.
+model CompanySettings {
+  id            String  @id @default(cuid())
+  legalEntityId String  @unique
+  /// The company the single-company UI is built around. The settings service
+  /// keeps this true on at most one row.
+  isPrimary     Boolean @default(false)
+  displayName   String
+  /// https URL or a small data: URI for the sidebar and payslip header.
+  logoUrl       String?
+  /// Prefix for generated employee numbers, e.g. PLX -> PLX-0012. Falls back to
+  /// the entity country code.
+  employeeNumberPrefix String?
+
+  defaultWorkScheduleId    String?
+  defaultHolidayCalendarId String?
+
+  // --- Attendance ----------------------------------------------------------
+  /// Arriving within this many minutes of the scheduled start is not late.
+  lateGraceMinutes            Int @default(10)
+  /// Leaving within this many minutes of the scheduled end is not early.
+  earlyLeaveGraceMinutes      Int @default(10)
+  /// A day with less than this share of scheduled minutes worked is PARTIAL.
+  partialDayThresholdPercent  Int @default(50)
+  /// An open check-in becomes MISSING_CHECKOUT this long after the shift ends.
+  missingCheckoutAfterMinutes Int @default(120)
+
+  // --- Overtime ------------------------------------------------------------
+  overtimeEnabled             Boolean @default(true)
+  /// When true, overtime reaches payroll only after someone approves it.
+  overtimeRequiresApproval    Boolean @default(true)
+  /// Overtime shorter than this is ignored.
+  minOvertimeMinutes          Int     @default(30)
+  countEarlyArrivalAsOvertime Boolean @default(false)
+  overtimeRateMultiplier      Decimal @default(1.25) @db.Decimal(4, 2)
+  /// Applied to work on weekends and public holidays.
+  restDayOvertimeMultiplier   Decimal @default(1.50) @db.Decimal(4, 2)
+  overtimeBase                PayBase @default(BASIC)
+  /// Hours in a standard working day, used to turn a daily rate into an hourly one.
+  standardDailyHours          Decimal @default(8) @db.Decimal(4, 2)
+
+  // --- Payroll -------------------------------------------------------------
+  /// Day of the month salaries are paid.
+  payrollDay                      Int            @default(28)
+  salaryDayBasis                  SalaryDayBasis @default(FIXED_30)
+  deductionBase                   PayBase        @default(BASIC)
+  absenceDeductionEnabled         Boolean        @default(true)
+  unpaidLeaveDeductionEnabled     Boolean        @default(true)
+  lateDeductionEnabled            Boolean        @default(false)
+  /// Four-eyes on money: the approver must not be the person who calculated.
+  payrollRequiresSeparateApprover Boolean        @default(true)
+
+  // --- Salary advances -----------------------------------------------------
+  maxAdvanceAmount        Decimal? @db.Decimal(12, 2)
+  maxAdvanceInstallments  Int      @default(12)
+  allowConcurrentAdvances Boolean  @default(false)
+
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  legalEntity            LegalEntity      @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  defaultWorkSchedule    WorkSchedule?    @relation("CompanyDefaultSchedule", fields: [defaultWorkScheduleId], references: [id], onDelete: SetNull)
+  defaultHolidayCalendar HolidayCalendar? @relation("CompanyDefaultCalendar", fields: [defaultHolidayCalendarId], references: [id], onDelete: SetNull)
+
+  @@map("company_settings")
+}
+
+/// Where people work. Deliberately not a legal entity: a remote employee in
+/// Algiers is employed by the Dubai company and simply works from elsewhere.
+model WorkLocation {
+  id            String           @id @default(cuid())
+  legalEntityId String
+  code          String           @unique
+  name          String
+  kind          WorkLocationKind @default(OFFICE)
+  addressLine   String?
+  city          String?
+  countryCode   String?          @db.Char(2)
+  countryName   String?
+  /// Null for a REMOTE location - each remote employee carries their own zone.
+  timezone      String?
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  employees   Employee[]
+
+  @@index([legalEntityId])
+  @@map("work_locations")
+}
+
+/// A reusable weekly schedule ("Standard Dubai Office", "Part-time mornings").
+model WorkSchedule {
+  id            String   @id @default(cuid())
+  legalEntityId String
+  code          String   @unique
+  name          String
+  description   String?
+  /// IANA zone the times are anchored to. Null means the times are read in
+  /// each employee's own timezone: "09:00 wherever you are".
+  timezone      String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  legalEntity LegalEntity       @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  days        WorkScheduleDay[]
+  employees   Employee[]
+  defaultFor  CompanySettings[] @relation("CompanyDefaultSchedule")
+
+  @@index([legalEntityId])
+  @@map("work_schedules")
+}
+
+model WorkScheduleDay {
+  id           String  @id @default(cuid())
+  scheduleId   String
+  /// 0 = Sunday .. 6 = Saturday, the same convention as LegalEntity.workWeek.
+  dayOfWeek    Int
+  isWorkingDay Boolean @default(true)
+  /// Minutes after local midnight: 540 = 09:00. Null on a day off.
+  startMinute  Int?
+  endMinute    Int?
+  breakMinutes Int     @default(0)
+
+  schedule WorkSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, dayOfWeek])
+  @@map("work_schedule_days")
+}
+
+/// A named set of holidays. Pollux's UAE calendar is the default; a remote
+/// employee can be assigned another one explicitly - it is never assumed from
+/// the country they live in.
+model HolidayCalendar {
+  id            String   @id @default(cuid())
+  legalEntityId String
+  code          String   @unique
+  name          String
+  countryCode   String?  @db.Char(2)
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  legalEntity LegalEntity       @relation(fields: [legalEntityId], references: [id], onDelete: Restrict)
+  holidays    Holiday[]
+  employees   Employee[]
+  defaultFor  CompanySettings[] @relation("CompanyDefaultCalendar")
+
+  @@index([legalEntityId])
+  @@map("holiday_calendars")
 }
 
 model Department {
@@ -241,6 +445,22 @@ model Employee {
   exitReason       String?
   noticePeriodDays Int            @default(30)
 
+  // Where and when they work. All optional: an employee with none of these set
+  // follows the company defaults (office timezone, default schedule, default
+  // holiday calendar).
+  workLocationId    String?
+  /// Country and city of work - for a remote employee, where they actually are.
+  workCountryCode   String? @db.Char(2)
+  workCountry       String?
+  workCity          String?
+  /// IANA zone the employee works in, e.g. Africa/Cairo.
+  timezone          String?
+  workScheduleId    String?
+  /// Explicit holiday calendar. Null means the company default calendar.
+  holidayCalendarId String?
+  /// Whether time beyond the schedule can become paid overtime.
+  overtimeEligible  Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -249,6 +469,9 @@ model Employee {
   manager          Employee?            @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
   directReports    Employee[]           @relation("EmployeeManager")
   headOfDepartment Department[]         @relation("DepartmentHead")
+  workLocation     WorkLocation?        @relation(fields: [workLocationId], references: [id], onDelete: SetNull)
+  workSchedule     WorkSchedule?        @relation(fields: [workScheduleId], references: [id], onDelete: SetNull)
+  holidayCalendar  HolidayCalendar?     @relation(fields: [holidayCalendarId], references: [id], onDelete: SetNull)
   user             User?
   compensation     CompensationRecord[]
   employmentEvents EmploymentEvent[]
@@ -261,6 +484,8 @@ model Employee {
   @@index([managerId])
   @@index([status])
   @@index([lastName, firstName])
+  @@index([workLocationId])
+  @@index([workScheduleId])
   @@map("employees")
 }
 
@@ -429,16 +654,23 @@ model LeaveType {
 }
 
 model Holiday {
-  id                  String   @id @default(cuid())
+  id                  String      @id @default(cuid())
+  /// Kept alongside the calendar so entity scoping and the original
+  /// "holidays of this entity" queries keep working.
   legalEntityId       String
+  calendarId          String
   name                String
-  date                DateTime @db.Date
-  isRecurringAnnually Boolean  @default(false)
-  createdAt           DateTime @default(now())
+  date                DateTime    @db.Date
+  type                HolidayType @default(PUBLIC)
+  /// A fixed-date holiday (e.g. 2 December) that repeats every year.
+  isRecurringAnnually Boolean     @default(false)
+  createdAt           DateTime    @default(now())
 
-  legalEntity LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  legalEntity LegalEntity     @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  calendar    HolidayCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
 
-  @@unique([legalEntityId, date])
+  @@unique([calendarId, date])
+  @@index([legalEntityId, date])
   @@index([date])
   @@map("holidays")
 }
@@ -583,6 +815,10 @@ model AuditLog {
   action      AuditAction
   entityType  String
   entityId    String?
+  /// Legal entity the audited record belongs to, when known. An entity-scoped
+  /// HR admin only sees entries tagged with their own entity. A plain column
+  /// rather than a relation: the trail must outlive anything it describes.
+  legalEntityId String?
   summary     String
   before      Json?
   after       Json?
@@ -595,5 +831,6 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorUserId])
   @@index([createdAt])
+  @@index([legalEntityId, createdAt])
   @@map("audit_logs")
 }

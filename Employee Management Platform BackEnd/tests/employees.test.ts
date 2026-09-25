@@ -121,9 +121,24 @@ describe('employee management', () => {
         .send({ firstName: 'No', lastName: 'Entity', workEmail: 'no.entity@test.demo' });
 
       expect(response.status).toBe(422);
-      expect(Object.keys(response.body.error.details)).toEqual(
-        expect.arrayContaining(['legalEntityId', 'jobTitle', 'hireDate']),
-      );
+      // legalEntityId is no longer required (Pollux resolves the company
+      // automatically); the genuinely required employment fields still are.
+      expect(Object.keys(response.body.error.details)).toEqual(expect.arrayContaining(['jobTitle', 'hireDate']));
+      expect(response.body.error.details).not.toHaveProperty('legalEntityId');
+    });
+
+    it('places a new employee in the primary company when no legal entity is given', async () => {
+      const response = await asUser(adminToken).post('/api/v1/employees').send({
+        firstName: 'Default', lastName: 'Company',
+        workEmail: 'default.company@test.demo',
+        jobTitle: 'Coordinator',
+        hireDate: '2026-09-01',
+      });
+
+      expect(response.status).toBe(201);
+      // With no settings row flagged primary, the oldest active entity is the company.
+      const oldest = await prisma.legalEntity.findFirstOrThrow({ orderBy: [{ establishedOn: 'asc' }, { createdAt: 'asc' }] });
+      expect(response.body.data.employee.legalEntity.id).toBe(oldest.id);
     });
   });
 

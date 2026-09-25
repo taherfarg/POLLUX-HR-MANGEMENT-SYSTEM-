@@ -31,6 +31,13 @@ export async function resetDatabase(): Promise<void> {
   await prisma.employee.updateMany({ data: { managerId: null } });
   await prisma.employee.deleteMany();
   await prisma.department.deleteMany();
+  // Pollux organisation structure: settings point at schedules and calendars,
+  // so they go first.
+  await prisma.companySettings.deleteMany();
+  await prisma.workScheduleDay.deleteMany();
+  await prisma.workSchedule.deleteMany();
+  await prisma.workLocation.deleteMany();
+  await prisma.holidayCalendar.deleteMany();
   await prisma.legalEntity.deleteMany();
 }
 
@@ -108,9 +115,16 @@ export async function createFixture(): Promise<Fixture> {
     },
   });
 
+  // Holidays live in a calendar; with no settings row the entity's first
+  // calendar is its default, exactly like an entity migrated from before
+  // calendars existed.
+  const calendarAe = await prisma.holidayCalendar.create({
+    data: { legalEntityId: entityAe.id, code: 'TST-AE-HOLIDAYS', name: 'Test UAE Holidays', countryCode: 'AE' },
+  });
+
   // A Wednesday, so it lands inside the working week of both entities.
   await prisma.holiday.create({
-    data: { legalEntityId: entityAe.id, name: 'Test Holiday', date: date('2026-11-04') },
+    data: { legalEntityId: entityAe.id, calendarId: calendarAe.id, name: 'Test Holiday', date: date('2026-11-04') },
   });
 
   const makeEmployee = async (input: {

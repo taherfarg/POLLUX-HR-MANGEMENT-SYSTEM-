@@ -6,6 +6,7 @@ import { toUtcDate } from '../../common/validate';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../common/errors';
 import type { AuthContext } from '../../common/auth-context';
 import {
+  assertCanCancelRequest,
   assertCanDecideRequest,
   canViewRequest,
   entityScopeWhere,
@@ -378,6 +379,7 @@ export async function submitLeaveRequest(
 
   const { workingDays } = await calculateLeaveDays({
     legalEntityId: employee.legalEntityId,
+    employeeId: employee.id,
     startDate,
     endDate,
     halfDayStart: input.halfDayStart,
@@ -445,6 +447,7 @@ export async function submitLeaveRequest(
           action: 'CREATE',
           entityType: 'Request',
           entityId: request.id,
+          legalEntityId: employee.legalEntityId,
           summary: `Submitted ${leaveType.name} request ${request.reference} for ${workingDays} day(s)`,
           after: { startDate: input.startDate, endDate: input.endDate, workingDays },
           actor: auth,
@@ -478,6 +481,7 @@ export async function previewLeaveDays(
   const employee = await resolveRequester(auth, input.employeeId);
   const result = await calculateLeaveDays({
     legalEntityId: employee.legalEntityId,
+    employeeId: employee.id,
     startDate: toUtcDate(input.startDate),
     endDate: toUtcDate(input.endDate),
     halfDayStart: input.halfDayStart,
@@ -532,6 +536,7 @@ export async function submitDocumentRequest(
           action: 'CREATE',
           entityType: 'Request',
           entityId: request.id,
+          legalEntityId: employee.legalEntityId,
           summary: `Requested ${DOCUMENT_TITLES[input.documentType]} (${request.reference})`,
           actor: auth,
           ...fingerprint,
@@ -632,6 +637,7 @@ export async function submitProfileChangeRequest(
           action: 'CREATE',
           entityType: 'Request',
           entityId: request.id,
+          legalEntityId: employee.legalEntityId,
           summary: `Proposed ${entries.length} profile change(s) (${request.reference})`,
           after: { fields: entries.map((entry) => entry.field) },
           actor: auth,
@@ -946,6 +952,7 @@ export async function approveRequest(
         action: 'APPROVE',
         entityType: 'Request',
         entityId: requestId,
+        legalEntityId: request.legalEntityId,
         summary: `Approved ${request.type} request ${request.reference}`,
         before: { status: 'PENDING' },
         after: { status: 'APPROVED', note: input.note ?? null },
@@ -1006,6 +1013,7 @@ export async function rejectRequest(
         action: 'REJECT',
         entityType: 'Request',
         entityId: requestId,
+        legalEntityId: request.legalEntityId,
         summary: `Rejected ${request.type} request ${request.reference}`,
         before: { status: 'PENDING' },
         after: { status: 'REJECTED', note: input.note },
@@ -1042,9 +1050,9 @@ export async function cancelRequest(
   const request = await loadRequestOrThrow(requestId);
 
   const isOwner = auth.employeeId === request.employeeId;
-  if (!isOwner && !isManagement(auth)) {
-    throw new ForbiddenError('Only the employee who submitted this request can withdraw it');
-  }
+  // The owner, or HR within scope - a scoped HR admin cannot cancel another
+  // entity's requests.
+  assertCanCancelRequest(auth, request);
 
   if (request.status !== 'PENDING') {
     throw new ConflictError(`Only pending requests can be withdrawn; this one is ${request.status.toLowerCase()}`);
@@ -1077,6 +1085,7 @@ export async function cancelRequest(
         action: 'CANCEL',
         entityType: 'Request',
         entityId: requestId,
+        legalEntityId: request.legalEntityId,
         summary: `Cancelled ${request.type} request ${request.reference}`,
         actor: auth,
         ...fingerprint,

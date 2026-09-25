@@ -52,7 +52,8 @@ export function isDirectManagerOf(auth: AuthContext, employee: EmployeeAccessSub
   return auth.employeeId !== null && employee.managerId === auth.employeeId;
 }
 
-function managesEmployee(auth: AuthContext, employee: EmployeeAccessSubject): boolean {
+/** HR or an administrator whose scope covers this employee. */
+export function managesEmployee(auth: AuthContext, employee: EmployeeAccessSubject): boolean {
   if (!isManagement(auth)) return false;
   const entityId = scopedEntityId(auth);
   return entityId === null || entityId === employee.legalEntityId;
@@ -174,3 +175,198 @@ export function assertIsManagement(auth: AuthContext): void {
     throw new ForbiddenError('This action is restricted to HR and administrators');
   }
 }
+
+/**
+ * Withdrawing a pending request: the employee who filed it, or HR within scope.
+ * Before this rule existed any management user could cancel any request,
+ * including one in an entity outside their scope.
+ */
+export function assertCanCancelRequest(
+  auth: AuthContext,
+  request: { employeeId: string; legalEntityId: string },
+): void {
+  const subject: EmployeeAccessSubject = { id: request.employeeId, legalEntityId: request.legalEntityId, managerId: null };
+  if (!isSelf(auth, subject) && !managesEmployee(auth, subject)) {
+    throw new ForbiddenError('Only the employee who submitted this request, or HR, can withdraw it');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pollux HR: administration
+// ---------------------------------------------------------------------------
+
+export function isAdmin(auth: AuthContext): boolean {
+  return auth.role === 'ADMIN';
+}
+
+export function assertIsAdmin(auth: AuthContext, action = 'This action'): void {
+  if (!isAdmin(auth)) {
+    throw new ForbiddenError(`${action} is restricted to administrators`);
+  }
+}
+
+/**
+ * Who may hand out which role.
+ *
+ * Granting ADMIN or HR_ADMIN is a global act reserved for a global ADMIN. An HR
+ * admin may create EMPLOYEE and MANAGER logins only - without this, a scoped HR
+ * admin could mint an ADMIN account through employee creation and step outside
+ * their own scope. An entity scope is only meaningful on an HR_ADMIN.
+ */
+export function assertCanAssignRole(
+  auth: AuthContext,
+  role: 'ADMIN' | 'HR_ADMIN' | 'MANAGER' | 'EMPLOYEE',
+  scopedLegalEntityId?: string | null,
+): void {
+  assertIsManagement(auth);
+  if ((role === 'ADMIN' || role === 'HR_ADMIN') && !isAdmin(auth)) {
+    throw new ForbiddenError('Only an administrator can grant the ADMIN or HR_ADMIN role');
+  }
+  if (scopedLegalEntityId && role !== 'HR_ADMIN') {
+    throw new ForbiddenError('An entity scope can only be set on an HR_ADMIN account');
+  }
+}
+
+/** Company settings shape every calculation, so only an ADMIN may change them. */
+export function assertCanManageCompanySettings(auth: AuthContext): void {
+  assertIsAdmin(auth, 'Changing company settings');
+}
+
+/** Management may only act on configuration belonging to an entity in scope. */
+export function assertCanManageEntityConfig(auth: AuthContext, legalEntityId: string): void {
+  assertIsManagement(auth);
+  assertEntityInScope(auth, legalEntityId);
+}
+
+/**
+ * Audit entries an HR admin may read. A scoped HR admin only sees entries
+ * tagged with their own entity - the trail carries salary before/after values,
+ * so an unscoped view would leak other entities' pay.
+ */
+export function auditScopeWhere(auth: AuthContext): Prisma.AuditLogWhereInput {
+  const entityId = scopedEntityId(auth);
+  return entityId ? { legalEntityId: entityId } : {};
+}
+
+// ---------------------------------------------------------------------------
+// Pollux HR: attendance
+// ---------------------------------------------------------------------------
+
+/**
+ * Attendance is working context, not pay: the employee, their direct manager
+ * and HR within scope may read it.
+ */
+export function canViewAttendance(auth: AuthContext, employee: EmployeeAccessSubject): boolean {
+  return isSelf(auth, employee) || managesEmployee(auth, employee) || isDirectManagerOf(auth, employee);
+}
+
+export function assertCanViewAttendance(auth: AuthContext, employee: EmployeeAccessSubject): void {
+  if (!canViewAttendance(auth, employee)) {
+    throw new ForbiddenError('You do not have access to this attendance record');
+  }
+}
+
+/** Creating or correcting someone's attendance is an HR act, never self-service. */
+export function canManageAttendance(auth: AuthContext, employee: EmployeeAccessSubject): boolean {
+  return managesEmployee(auth, employee);
+}
+
+export function assertCanManageAttendance(auth: AuthContext, employee: EmployeeAccessSubject): void {
+  if (!canManageAttendance(auth, employee)) {
+    throw new ForbiddenError('Only HR can create or correct attendance records');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pollux HR: pay - payroll, payslips, advances, adjustments
+// ---------------------------------------------------------------------------
+
+/**
+ * Anything that reveals what someone is paid - payslips, payroll lines,
+ * advances, overtime amounts - follows the compensation rule: the employee
+ * themselves and HR within scope. A line manager is deliberately excluded.
+ */
+export function canViewPayData(auth: AuthContext, employee: EmployeeAccessSubject): boolean {
+  return canViewCompensation(auth, employee);
+}
+
+export function assertCanViewPayData(auth: AuthContext, employee: EmployeeAccessSubject): void {
+  if (!canViewPayData(auth, employee)) {
+    throw new ForbiddenError('Pay information is restricted to HR and the employee');
+  }
+}
+
+/** Running payroll for an entity: HR or an administrator within scope. */
+export function assertCanManagePayroll(auth: AuthContext, legalEntityId: string): void {
+  if (!isManagement(auth)) {
+    throw new ForbiddenError('Payroll is restricted to HR and administrators');
+  }
+  assertEntityInScope(auth, legalEntityId);
+}
+
+/** Only an ADMIN may reopen an approved payroll - it unlocks financial records. */
+export function assertCanReopenPayroll(auth: AuthContext, legalEntityId: string): void {
+  assertIsAdmin(auth, 'Reopening an approved payroll');
+  assertEntityInScope(auth, legalEntityId);
+}
+
+/**
+ * Deciding a salary advance moves money, so it is HR within scope - never the
+ * line manager, and never the employee deciding their own.
+ */
+export function assertCanDecideAdvance(auth: AuthContext, employee: EmployeeAccessSubject): void {
+  if (isSelf(auth, employee)) {
+    throw new ForbiddenError('You cannot decide your own salary advance');
+  }
+  if (!managesEmployee(auth, employee)) {
+    throw new ForbiddenError('Only HR can decide salary advances');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pollux HR: overtime
+// ---------------------------------------------------------------------------
+
+/** Overtime minutes are working context, like attendance. */
+export function canViewOvertime(auth: AuthContext, employee: EmployeeAccessSubject): boolean {
+  return canViewAttendance(auth, employee);
+}
+
+/** Overtime *amounts* are pay, so a line manager sees minutes only. */
+export function canViewOvertimeAmounts(auth: AuthContext, employee: EmployeeAccessSubject): boolean {
+  return canViewPayData(auth, employee);
+}
+
+/**
+ * Approving overtime minutes: HR within scope or the direct manager, and
+ * nobody decides their own.
+ */
+export function assertCanDecideOvertime(auth: AuthContext, employee: EmployeeAccessSubject): void {
+  if (isSelf(auth, employee)) {
+    throw new ForbiddenError('You cannot approve your own overtime');
+  }
+  if (!managesEmployee(auth, employee) && !isDirectManagerOf(auth, employee)) {
+    throw new ForbiddenError('Only HR or the direct manager can decide this overtime');
+  }
+}
+
+/**
+ * What the caller may do with one employee's record. Returned to the UI so it
+ * can decide which profile tabs to show - the API still enforces every rule on
+ * the underlying endpoints, so this is a hint, never a permission.
+ */
+export function employeeCapabilities(auth: AuthContext, employee: EmployeeAccessSubject) {
+  return {
+    canEdit: canEditEmployee(auth, employee),
+    canViewPersonal: isSelf(auth, employee) || managesEmployee(auth, employee),
+    canViewCompensation: canViewCompensation(auth, employee),
+    canViewPayData: canViewPayData(auth, employee),
+    canViewAttendance: canViewAttendance(auth, employee),
+    canManageAttendance: canManageAttendance(auth, employee),
+    canViewLeave: isSelf(auth, employee) || isManagement(auth) || isDirectManagerOf(auth, employee),
+    canViewDocuments: isSelf(auth, employee) || managesEmployee(auth, employee),
+    canViewTimeline: isSelf(auth, employee) || managesEmployee(auth, employee),
+  };
+}
+
+export type EmployeeCapabilities = ReturnType<typeof employeeCapabilities>;

@@ -9,6 +9,11 @@ export interface AuditInput {
   action: AuditAction;
   entityType: string;
   entityId?: string | null;
+  /**
+   * Legal entity the audited record belongs to. Tagging it is what lets an
+   * entity-scoped HR admin read their own trail without reading everyone's.
+   */
+  legalEntityId?: string | null;
   summary: string;
   before?: Prisma.InputJsonValue | null;
   after?: Prisma.InputJsonValue | null;
@@ -46,6 +51,7 @@ export async function recordAudit(input: AuditInput, client: TxClient = prisma):
         action: input.action,
         entityType: input.entityType,
         entityId: input.entityId ?? null,
+        legalEntityId: input.legalEntityId ?? null,
         summary: input.summary,
         before: input.before ?? Prisma.JsonNull,
         after: input.after ?? Prisma.JsonNull,

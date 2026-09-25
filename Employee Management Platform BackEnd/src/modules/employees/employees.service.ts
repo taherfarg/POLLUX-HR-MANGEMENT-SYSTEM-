@@ -6,14 +6,17 @@ import { toUtcDate } from '../../common/validate';
 import { ConflictError, NotFoundError, ValidationError } from '../../common/errors';
 import type { AuthContext } from '../../common/auth-context';
 import {
+  assertCanAssignRole,
   assertCanEditEmployee,
   assertEntityInScope,
   assertIsManagement,
+  employeeCapabilities,
   employeeViewLevel,
   entityScopeWhere,
   isManagement,
   type EmployeeAccessSubject,
 } from '../../services/access';
+import { resolveLegalEntityId } from '../../services/company';
 import { diffRecords, recordAudit, type AuditInput } from '../../services/audit.service';
 import { notifyEmployee } from '../../services/notification.service';
 import { hashPassword } from '../auth/password';
@@ -87,6 +90,8 @@ function buildWhere(auth: AuthContext, query: EmployeeQuery): Prisma.EmployeeWhe
   if (query.legalEntityId) filters.push({ legalEntityId: query.legalEntityId });
   if (query.departmentId) filters.push({ departmentId: query.departmentId });
   if (query.managerId) filters.push({ managerId: query.managerId });
+  if (query.workLocationId) filters.push({ workLocationId: query.workLocationId });
+  if (query.workScheduleId) filters.push({ workScheduleId: query.workScheduleId });
   if (query.status?.length) filters.push({ status: { in: query.status } });
   if (query.employmentType?.length) filters.push({ employmentType: { in: query.employmentType } });
   if (query.workMode?.length) filters.push({ workMode: { in: query.workMode } });
@@ -127,19 +132,23 @@ export async function getEmployee(auth: AuthContext, employeeId: string): Promis
   }
 
   const level = employeeViewLevel(auth, employee);
-  return serializeEmployeeDetail(employee, level, { includeAccount: isManagement(auth) });
+  return serializeEmployeeDetail(employee, level, {
+    includeAccount: isManagement(auth),
+    capabilities: employeeCapabilities(auth, employee),
+  });
 }
 
 /**
- * Employee numbers are per legal entity and readable: AE-0007, SA-0003.
+ * Employee numbers are readable and prefixed per company: PLX-0007, or the
+ * entity country code (AE-0007) when no prefix is configured.
  *
- * The next value is derived from the highest existing number for that entity
+ * The next value is derived from the highest existing number for that prefix
  * inside the creating transaction. Under a concurrent insert the unique
  * constraint rejects the duplicate and the caller retries - correctness comes
  * from the constraint, not from the read.
  */
-async function nextEmployeeNumber(tx: TxClient, countryCode: string): Promise<string> {
-  const prefix = `${countryCode.toUpperCase()}-`;
+async function nextEmployeeNumber(tx: TxClient, prefixSource: string): Promise<string> {
+  const prefix = `${prefixSource.toUpperCase()}-`;
   const latest = await tx.employee.findFirst({
     where: { employeeNumber: { startsWith: prefix } },
     orderBy: { employeeNumber: 'desc' },
@@ -200,17 +209,77 @@ function generateTemporaryPassword(): string {
   return `Ems${random}7`;
 }
 
+/**
+ * Checks that the work location, schedule and holiday calendar an employee is
+ * being pointed at exist, are active, and belong to the employee's company -
+ * a schedule from another entity would silently apply the wrong policy.
+ */
+async function assertWorkContextReferences(
+  legalEntityId: string,
+  input: { workLocationId?: string | null; workScheduleId?: string | null; holidayCalendarId?: string | null },
+): Promise<void> {
+  const errors: Record<string, string[]> = {};
+
+  if (input.workLocationId) {
+    const location = await prisma.workLocation.findUnique({
+      where: { id: input.workLocationId },
+      select: { legalEntityId: true, isActive: true },
+    });
+    if (!location || location.legalEntityId !== legalEntityId || !location.isActive) {
+      errors.workLocationId = ['Choose an active work location belonging to this company'];
+    }
+  }
+  if (input.workScheduleId) {
+    const schedule = await prisma.workSchedule.findUnique({
+      where: { id: input.workScheduleId },
+      select: { legalEntityId: true, isActive: true },
+    });
+    if (!schedule || schedule.legalEntityId !== legalEntityId || !schedule.isActive) {
+      errors.workScheduleId = ['Choose an active work schedule belonging to this company'];
+    }
+  }
+  if (input.holidayCalendarId) {
+    const calendar = await prisma.holidayCalendar.findUnique({
+      where: { id: input.holidayCalendarId },
+      select: { legalEntityId: true, isActive: true },
+    });
+    if (!calendar || calendar.legalEntityId !== legalEntityId || !calendar.isActive) {
+      errors.holidayCalendarId = ['Choose an active holiday calendar belonging to this company'];
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    throw new ValidationError('Validation failed', errors);
+  }
+}
+
 export async function createEmployee(
   auth: AuthContext,
   input: CreateEmployeeInput,
   fingerprint: Fingerprint,
 ): Promise<{ employee: Record<string, unknown>; temporaryPassword?: string }> {
   assertIsManagement(auth);
-  assertEntityInScope(auth, input.legalEntityId);
+  const legalEntityId = await resolveLegalEntityId(auth, input.legalEntityId);
+  assertEntityInScope(auth, legalEntityId);
+
+  // Checked before anything is written: an HR admin must not be able to mint
+  // an ADMIN login by creating an employee.
+  if (input.account) {
+    assertCanAssignRole(auth, input.account.role, input.account.scopedLegalEntityId ?? null);
+    if (input.account.scopedLegalEntityId) assertEntityInScope(auth, input.account.scopedLegalEntityId);
+  }
 
   const legalEntity = await prisma.legalEntity.findUnique({
-    where: { id: input.legalEntityId },
-    select: { id: true, countryCode: true, currency: true, probationMonths: true, noticePeriodDays: true, isActive: true },
+    where: { id: legalEntityId },
+    select: {
+      id: true,
+      countryCode: true,
+      currency: true,
+      probationMonths: true,
+      noticePeriodDays: true,
+      isActive: true,
+      settings: { select: { employeeNumberPrefix: true } },
+    },
   });
   if (!legalEntity) {
     throw new ValidationError('Validation failed', { legalEntityId: ['Legal entity does not exist'] });
@@ -239,6 +308,8 @@ export async function createEmployee(
     }
   }
 
+  await assertWorkContextReferences(legalEntityId, input);
+
   const accountEmail = input.account ? (input.account.email ?? input.workEmail) : null;
   if (accountEmail) {
     const existing = await prisma.user.findUnique({ where: { email: accountEmail }, select: { id: true } });
@@ -259,7 +330,7 @@ export async function createEmployee(
   const created = await prisma.$transaction(async (tx) => {
     const employee = await tx.employee.create({
       data: {
-        employeeNumber: await nextEmployeeNumber(tx, legalEntity.countryCode),
+        employeeNumber: await nextEmployeeNumber(tx, legalEntity.settings?.employeeNumberPrefix ?? legalEntity.countryCode),
         firstName: input.firstName,
         lastName: input.lastName,
         preferredName: input.preferredName ?? null,
@@ -276,7 +347,7 @@ export async function createEmployee(
         emergencyContactPhone: input.emergencyContactPhone ?? null,
         emergencyContactRelation: input.emergencyContactRelation ?? null,
         avatarUrl: input.avatarUrl ?? null,
-        legalEntityId: input.legalEntityId,
+        legalEntityId,
         departmentId: input.departmentId ?? null,
         managerId: input.managerId ?? null,
         jobTitle: input.jobTitle,
@@ -288,6 +359,14 @@ export async function createEmployee(
         probationEndDate: probationEnd,
         contractEndDate: input.contractEndDate ? toUtcDate(input.contractEndDate) : null,
         noticePeriodDays: input.noticePeriodDays ?? legalEntity.noticePeriodDays,
+        workLocationId: input.workLocationId ?? null,
+        workScheduleId: input.workScheduleId ?? null,
+        holidayCalendarId: input.holidayCalendarId ?? null,
+        workCountryCode: input.workCountryCode ?? null,
+        workCountry: input.workCountry ?? null,
+        workCity: input.workCity ?? null,
+        timezone: input.timezone ?? null,
+        overtimeEligible: input.overtimeEligible ?? true,
       },
       include: employeeDetailInclude,
     });
@@ -343,6 +422,7 @@ export async function createEmployee(
         action: 'CREATE',
         entityType: 'Employee',
         entityId: employee.id,
+        legalEntityId: employee.legalEntityId,
         summary: `Created employee ${employee.employeeNumber} - ${fullName(employee)}`,
         after: {
           employeeNumber: employee.employeeNumber,
@@ -356,7 +436,11 @@ export async function createEmployee(
       tx,
     );
 
-    return employee;
+    // Re-read so the response includes the login that was just created; the
+    // row loaded at insert time predates it.
+    return input.account
+      ? tx.employee.findUniqueOrThrow({ where: { id: employee.id }, include: employeeDetailInclude })
+      : employee;
   });
 
   if (input.account) {
@@ -417,6 +501,25 @@ function timelineEventsFor(
       next: input.contractEndDate,
     });
   }
+  // Where someone works is part of their employment story ("moved to remote,
+  // Cairo"), so a change of work mode or location is a timeline event too.
+  const locationChanged = input.workLocationId !== undefined && input.workLocationId !== before.workLocationId;
+  const modeChanged = input.workMode !== undefined && input.workMode !== before.workMode;
+  const cityChanged = input.workCity !== undefined && input.workCity !== before.workCity;
+  if (locationChanged || modeChanged || cityChanged) {
+    const mode = input.workMode ?? before.workMode;
+    const city = input.workCity === undefined ? before.workCity : input.workCity;
+    events.push({
+      type: 'TRANSFER',
+      title: `Work arrangement changed to ${mode.toLowerCase()}${city ? ` (${city})` : ''}`,
+      previous: { workMode: before.workMode, workLocationId: before.workLocationId, workCity: before.workCity },
+      next: {
+        workMode: mode,
+        workLocationId: input.workLocationId === undefined ? before.workLocationId : input.workLocationId,
+        workCity: city,
+      },
+    });
+  }
 
   return events;
 }
@@ -450,6 +553,8 @@ export async function updateEmployee(
     await assertNoReportingCycle(employeeId, input.managerId);
   }
 
+  await assertWorkContextReferences(input.legalEntityId ?? existing.legalEntityId, input);
+
   const data: Prisma.EmployeeUpdateInput = {};
   const assign = <K extends keyof Prisma.EmployeeUpdateInput>(key: K, value: Prisma.EmployeeUpdateInput[K]): void => {
     if (value !== undefined) data[key] = value;
@@ -475,6 +580,11 @@ export async function updateEmployee(
   assign('contractType', input.contractType);
   assign('workMode', input.workMode);
   assign('noticePeriodDays', input.noticePeriodDays);
+  assign('workCountryCode', input.workCountryCode);
+  assign('workCountry', input.workCountry);
+  assign('workCity', input.workCity);
+  assign('timezone', input.timezone);
+  assign('overtimeEligible', input.overtimeEligible);
 
   if (input.dateOfBirth) data.dateOfBirth = toUtcDate(input.dateOfBirth);
   if (input.hireDate) data.hireDate = toUtcDate(input.hireDate);
@@ -486,6 +596,15 @@ export async function updateEmployee(
   }
   if (input.managerId !== undefined) {
     data.manager = input.managerId ? { connect: { id: input.managerId } } : { disconnect: true };
+  }
+  if (input.workLocationId !== undefined) {
+    data.workLocation = input.workLocationId ? { connect: { id: input.workLocationId } } : { disconnect: true };
+  }
+  if (input.workScheduleId !== undefined) {
+    data.workSchedule = input.workScheduleId ? { connect: { id: input.workScheduleId } } : { disconnect: true };
+  }
+  if (input.holidayCalendarId !== undefined) {
+    data.holidayCalendar = input.holidayCalendarId ? { connect: { id: input.holidayCalendarId } } : { disconnect: true };
   }
 
   const events = timelineEventsFor(existing, input);
@@ -517,6 +636,7 @@ export async function updateEmployee(
         action: 'UPDATE',
         entityType: 'Employee',
         entityId: employeeId,
+        legalEntityId: employee.legalEntityId,
         summary: `Updated employee ${existing.employeeNumber}`,
         before: diff?.before ?? null,
         after: diff?.after ?? null,
@@ -621,6 +741,7 @@ export async function changeEmployeeStatus(
         action: 'UPDATE',
         entityType: 'Employee',
         entityId: employeeId,
+        legalEntityId: existing.legalEntityId,
         summary: `Status changed ${existing.status} to ${input.status}: ${input.reason}`,
         before: { status: existing.status },
         after: { status: input.status, effectiveDate: input.effectiveDate },

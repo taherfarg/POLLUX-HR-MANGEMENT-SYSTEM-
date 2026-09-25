@@ -7,12 +7,28 @@ import {
   phoneSchema,
   requiredTrimmedString,
 } from '../../common/validate';
+import { timeZoneSchema } from '../settings/settings.schema';
 
 const employeeStatus = z.enum(['PROBATION', 'ACTIVE', 'ON_LEAVE', 'NOTICE_PERIOD', 'OFFBOARDED']);
 const employmentType = z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN']);
 const contractType = z.enum(['UNLIMITED', 'LIMITED']);
-const workMode = z.enum(['ONSITE', 'HYBRID', 'REMOTE']);
+const workMode = z.enum(['ONSITE', 'HYBRID', 'REMOTE', 'FIELD']);
 const gender = z.enum(['MALE', 'FEMALE', 'UNDISCLOSED']);
+
+/**
+ * A reference that can be cleared: a string sets it, `null` (or an empty
+ * string from a form) clears it, and omitting it leaves it untouched.
+ */
+const clearableId = z
+  .union([z.string().trim().max(40), z.null()])
+  .optional()
+  .transform((value) => (value === '' ? null : value));
+
+const clearableText = (max: number) =>
+  z
+    .union([z.string().trim().max(max), z.null()])
+    .optional()
+    .transform((value) => (value === '' ? null : value));
 
 /** Accepts `?status=ACTIVE&status=PROBATION` and `?status=ACTIVE,PROBATION`. */
 function csvEnum<T extends z.ZodEnum<[string, ...string[]]>>(schema: T) {
@@ -35,6 +51,8 @@ export const employeeQuerySchema = paginationSchema.extend({
   legalEntityId: optionalTrimmedString(40),
   departmentId: optionalTrimmedString(40),
   managerId: optionalTrimmedString(40),
+  workLocationId: optionalTrimmedString(40),
+  workScheduleId: optionalTrimmedString(40),
   status: csvEnum(employeeStatus),
   employmentType: csvEnum(employmentType),
   workMode: csvEnum(workMode),
@@ -67,7 +85,11 @@ const personalFields = {
 };
 
 const employmentFields = {
-  legalEntityId: requiredTrimmedString(1, 40),
+  /**
+   * Optional since Pollux runs as a single company: when omitted the employee
+   * joins the primary company (or a scoped HR admin's own entity).
+   */
+  legalEntityId: optionalTrimmedString(40),
   departmentId: optionalTrimmedString(40),
   managerId: optionalTrimmedString(40),
   jobTitle: requiredTrimmedString(2, 120),
@@ -79,6 +101,22 @@ const employmentFields = {
   probationEndDate: dateStringSchema.optional(),
   contractEndDate: dateStringSchema.optional(),
   noticePeriodDays: z.coerce.number().int().min(0).max(365).optional(),
+};
+
+/** Where and when the employee works. Every field can be cleared with null. */
+const workContextFields = {
+  workLocationId: clearableId,
+  workScheduleId: clearableId,
+  holidayCalendarId: clearableId,
+  workCountryCode: z
+    .union([z.string().trim().length(2).toUpperCase(), z.null()])
+    .optional(),
+  workCountry: clearableText(80),
+  workCity: clearableText(80),
+  timezone: z
+    .union([timeZoneSchema, z.null()])
+    .optional(),
+  overtimeEligible: z.boolean().optional(),
 };
 
 /** Starting salary. Optional so HR can add an employee before pay is agreed. */
@@ -107,6 +145,7 @@ export const createEmployeeSchema = z
   .object({
     ...personalFields,
     ...employmentFields,
+    ...workContextFields,
     compensation: compensationInput.optional(),
     account: accountInput.optional(),
   })
@@ -128,6 +167,7 @@ export const updateEmployeeSchema = z
   .object({
     ...personalFields,
     ...employmentFields,
+    ...workContextFields,
   })
   .partial()
   .omit({ status: true })
