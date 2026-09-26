@@ -64,6 +64,9 @@ test.describe('On-site check-in', () => {
     await forced.getByLabel('Confirm new password').fill('OmarPollux2026')
     await forced.getByRole('button', { name: 'Change password' }).click()
     await page.getByRole('dialog', { name: 'Password updated' }).getByRole('button', { name: 'Return to sign in' }).click()
+    // Signing out is done when the form is back. Reloading before that can keep
+    // the old token, which is still valid, and the session comes back.
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
     await signIn(page, login.body.data.user.email, 'OmarPollux2026')
 
     const card = page.getByRole('region', { name: "Today's attendance" })
