@@ -18,7 +18,7 @@ import {
   useSubmit,
 } from '../components/ui.jsx'
 import LetterModal from '../components/LetterModal.jsx'
-import { EmployeePicker } from './AttendancePage.jsx'
+import { EmployeePicker } from '../components/EmployeePicker.jsx'
 import { useDebouncedValue, useResource } from '../hooks/useResource.js'
 import { downloadFile } from '../lib/download.js'
 import { formatDate } from '../lib/format.js'

@@ -118,4 +118,43 @@ test.describe('Leave requests', () => {
     const refused = await apiAs(page, `/requests/${created.body.data.id}/approve`, { method: 'POST', body: {} })
     expect([403, 404]).toContain(refused.status)
   })
+
+  test('HR records leave that has already started, for someone else, and approves it at once', async ({ page }) => {
+    const health = trackPageHealth(page)
+    // Monday to Wednesday of the week before last: leave that has already
+    // happened. In early January that week belongs to last year's balance,
+    // so the window moves six weeks on instead.
+    const start = new Date()
+    start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7) - 14)
+    if (start.getUTCFullYear() !== new Date().getUTCFullYear()) start.setUTCDate(start.getUTCDate() + 42)
+    const end = new Date(start)
+    end.setUTCDate(end.getUTCDate() + 2)
+    const iso = (date) => date.toISOString().slice(0, 10)
+
+    await signIn(page, ACCOUNTS.hr)
+    // Rashid, the PRO officer, has no login and nothing else in this suite
+    // touches his leave.
+    const rashid = (await apiAs(page, '/employees?q=Rashid')).body.data[0]
+    const annualBefore = (await apiAs(page, `/employees/${rashid.id}/leave-balances`)).body.data.find((row) => row.leaveType.code === 'ANNUAL')
+
+    await gotoPage(page, 'Requests')
+    await page.getByRole('button', { name: 'Record leave' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Record leave' })
+    await dialog.getByRole('combobox', { name: /^Employee/ }).selectOption({ label: `${rashid.fullName} (${rashid.employeeNumber})` })
+    await expect(dialog.getByLabel('Leave type')).toHaveValue(/.+/)
+    await dialog.getByLabel('Start date').fill(iso(start))
+    await dialog.getByLabel('End date').fill(iso(end))
+    // His own count, from his own schedule and calendar.
+    await expect(dialog).toContainText(/This request uses \d+(\.\d+)? working day/)
+    const days = Number((await dialog.locator('.leave-balance-inline p b').innerText()).trim())
+    await dialog.getByLabel('Reason').fill('Annual leave agreed before it was recorded')
+    await expect(dialog.getByRole('checkbox', { name: /Approve it now/ })).toBeChecked()
+    await dialog.getByRole('button', { name: 'Record and approve' }).click()
+    await expect(page.locator('.toast')).toContainText(new RegExp(`LV-\\d{4}-\\d{4} approved — ${days} day\\(s\\) of leave for ${rashid.fullName}`))
+
+    const annualAfter = (await apiAs(page, `/employees/${rashid.id}/leave-balances`)).body.data.find((row) => row.leaveType.code === 'ANNUAL')
+    expect(annualAfter.usedDays).toBe(annualBefore.usedDays + days)
+    expect(annualAfter.pendingDays).toBe(annualBefore.pendingDays)
+    health.assertClean()
+  })
 })

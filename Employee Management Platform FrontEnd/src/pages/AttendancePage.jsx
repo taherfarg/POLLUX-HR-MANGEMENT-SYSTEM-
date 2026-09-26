@@ -18,6 +18,7 @@ import {
   useSubmit,
 } from '../components/ui.jsx'
 import { AttendanceStatus, ATTENDANCE_LABELS } from '../components/attendance.jsx'
+import { EmployeePicker } from '../components/EmployeePicker.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useDebouncedValue, useResource } from '../hooks/useResource.js'
 import { emitChange, useChangeListener } from '../lib/events.js'
@@ -347,22 +348,6 @@ function Register({ canManage, onEdit, onCreate }) {
   )
 }
 
-function EmployeePicker({ value, onChange, error }) {
-  const people = useResource(() => fetchEmployees({ pageSize: 100, sortBy: 'name' }), [])
-  return (
-    <FormField label="Employee" error={error}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} required>
-        <option value="">Choose an employee</option>
-        {(people.data?.items ?? []).map((person) => (
-          <option key={person.id} value={person.id}>
-            {person.fullName} ({person.employeeNumber})
-          </option>
-        ))}
-      </select>
-    </FormField>
-  )
-}
-
 const OVERRIDE_OPTIONS = [
   { value: '', label: 'Calculate from the times' },
   ...['PRESENT', 'LATE', 'ABSENT', 'PARTIAL', 'ON_LEAVE', 'HOLIDAY', 'WEEKEND'].map((value) => ({ value, label: ATTENDANCE_LABELS[value] })),
@@ -569,4 +554,3 @@ function EmployeePickerOptional({ value, onChange }) {
   )
 }
 
-export { EmployeePicker }

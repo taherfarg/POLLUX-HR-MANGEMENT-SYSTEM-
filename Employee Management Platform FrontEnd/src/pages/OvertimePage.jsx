@@ -18,7 +18,7 @@ import {
   humanize,
   useSubmit,
 } from '../components/ui.jsx'
-import { EmployeePicker } from './AttendancePage.jsx'
+import { EmployeePicker } from '../components/EmployeePicker.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { formatDate, formatMinutes, todayIso } from '../lib/format.js'

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ClipboardCheck } from 'lucide-react'
+import { ClipboardCheck, Plus } from 'lucide-react'
 import { Async, Avatar, DataTable, EmptyState, FilterSelect, PageHeader, Pagination, Panel, SearchInput, SegmentedTabs, StatusPill } from '../components/ui.jsx'
 import RequestDetail from '../components/RequestDetail.jsx'
+import { RecordLeaveModal } from '../components/RequestFormModal.jsx'
 import { useDebouncedValue, useResource } from '../hooks/useResource.js'
 import { formatDate, plural, relativeTime } from '../lib/format.js'
 import { fetchRequests } from '../api/endpoints.js'
@@ -30,6 +31,7 @@ export default function RequestsPage({ session, param, navigate, onToast, onPend
   const [type, setType] = useState('')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
+  const [recording, setRecording] = useState(false)
   const debounced = useDebouncedValue(query, 300)
   useEffect(() => setPage(1), [status, type, debounced])
 
@@ -44,6 +46,24 @@ export default function RequestsPage({ session, param, navigate, onToast, onPend
       <PageHeader
         title={session.isManagement ? 'Requests' : 'Approvals'}
         description={session.isManagement ? 'Leave, document and profile requests from everyone.' : "Your team's leave and other requests."}
+        actions={
+          session.isManagement && (
+            <button className="button button-primary" onClick={() => setRecording(true)}>
+              <Plus size={16} /> Record leave
+            </button>
+          )
+        }
+      />
+      <RecordLeaveModal
+        open={recording}
+        session={session}
+        onClose={() => setRecording(false)}
+        onRecorded={() => {
+          setRecording(false)
+          inbox.reload()
+          onPendingChanged?.()
+        }}
+        onToast={onToast}
       />
       <Panel flush>
         <div className="toolbar">

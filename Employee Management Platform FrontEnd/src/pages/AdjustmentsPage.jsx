@@ -18,7 +18,7 @@ import {
   humanize,
   useSubmit,
 } from '../components/ui.jsx'
-import { EmployeePicker } from './AttendancePage.jsx'
+import { EmployeePicker } from '../components/EmployeePicker.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { currentMonthKey, formatMonth } from '../lib/format.js'
 import { approveAdjustment, cancelAdjustment, createAdjustment, fetchAdjustments, rejectAdjustment } from '../api/endpoints.js'

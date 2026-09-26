@@ -259,7 +259,7 @@ HR_ADMIN.
 | PATCH | `/leave/balances/:id` | HR. Entitlement / carried days with a reason; never below used + pending |
 | GET | `/requests` | Unified inbox with per-status `summary` |
 | POST | `/requests/leave/preview` | Chargeable days from the employee's schedule and calendar |
-| POST | `/requests/leave` · `/requests/document` · `/requests/profile-change` | |
+| POST | `/requests/leave` · `/requests/document` · `/requests/profile-change` | HR may pass `employeeId` to file for someone in scope; for leave, the notice period then does not apply, so an absence that has already started can be recorded |
 | GET | `/requests/:id` | |
 | POST | `/requests/:id/approve` · `/reject` · `/cancel` | HR or the direct manager decide (never the requester); reject needs a reason |
 </details>
@@ -360,7 +360,7 @@ tracked from the day after setup. Walkthrough: [DEPLOYMENT.md, step 4a](../DEPLO
 TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?schema=public npm test
 ```
 
-**292 tests across 15 files**, against a real PostgreSQL test database:
+**293 tests across 15 files**, against a real PostgreSQL test database:
 
 | File | Covers |
 |---|---|

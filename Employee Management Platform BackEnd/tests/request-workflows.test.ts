@@ -225,6 +225,38 @@ describe('request workflows', () => {
       expect(response.status).toBe(201);
       expect(response.body.data.employee.id).toBe(fixture.colleague);
     });
+
+    it('lets HR record leave that has already started, with no notice period, and approve it', async () => {
+      // The notice period binds the employee planning ahead, not HR recording
+      // leave that was agreed in person or has already begun.
+      await prisma.leaveType.update({ where: { id: fixture.annualAe }, data: { minNoticeDays: 7 } });
+      try {
+        const own = await asUser(employeeToken).post('/api/v1/requests/leave').send({
+          leaveTypeId: fixture.annualAe, startDate: '2026-09-07', endDate: '2026-09-10', reason: 'Backdated by myself',
+        });
+        expect(own.status).toBe(422);
+
+        const before = await annualBalance(fixture.colleague);
+        const recorded = await asUser(adminToken).post('/api/v1/requests/leave').send({
+          employeeId: fixture.colleague,
+          leaveTypeId: fixture.annualAe, startDate: '2026-09-07', endDate: '2026-09-10',
+          reason: 'Annual leave agreed before it was recorded',
+        });
+        expect(recorded.status).toBe(201);
+        expect(recorded.body.data.status).toBe('PENDING');
+
+        // The person who recorded it may decide it: it is the colleague's request, not theirs.
+        const approved = await asUser(adminToken).post(`/api/v1/requests/${recorded.body.data.id}/approve`).send({ note: 'Recorded and approved by HR' });
+        expect(approved.status).toBe(200);
+        expect(approved.body.data.status).toBe('APPROVED');
+
+        const after = await annualBalance(fixture.colleague);
+        expect(after.used - before.used).toBe(4); // Monday 7 to Thursday 10 September
+        expect(after.pending).toBe(before.pending);
+      } finally {
+        await prisma.leaveType.update({ where: { id: fixture.annualAe }, data: { minNoticeDays: 0 } });
+      }
+    });
   });
 
   describe('approval rules', () => {

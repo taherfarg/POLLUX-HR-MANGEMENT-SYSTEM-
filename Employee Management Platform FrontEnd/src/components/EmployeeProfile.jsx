@@ -23,7 +23,7 @@ import { MonthCalendar } from './attendance.jsx'
 import { BalanceCards } from './leave.jsx'
 import EmployeeForm from './EmployeeForm.jsx'
 import LetterModal from './LetterModal.jsx'
-import RequestFormModal from './RequestFormModal.jsx'
+import RequestFormModal, { RecordLeaveModal } from './RequestFormModal.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { downloadFile, openFile } from '../lib/download.js'
 import { currentMonthKey, formatDate, formatDays, formatMinutes, formatMonth, monthBounds, shiftMonthKey, todayIso } from '../lib/format.js'
@@ -141,7 +141,7 @@ export default function EmployeeProfile({ employeeId, self = false, session, onB
           {tab === 'personal' && <PersonalTab employee={employee} />}
           {tab === 'employment' && <EmploymentTab employee={employee} />}
           {tab === 'attendance' && <AttendanceTab employee={employee} self={self} />}
-          {tab === 'leave' && <LeaveTab employee={employee} self={self} />}
+          {tab === 'leave' && <LeaveTab employee={employee} self={self} canRecord={caps.canEdit && !self} session={session} onToast={onToast} />}
           {tab === 'salary' && <SalaryTab employee={employee} canEdit={caps.canEdit} onToast={onToast} />}
           {tab === 'advances' && <AdvancesTab employee={employee} self={self} />}
           {tab === 'payroll' && <PayrollTab employee={employee} self={self} onToast={onToast} />}
@@ -316,12 +316,13 @@ function MiniStat({ label, value }) {
   )
 }
 
-function LeaveTab({ employee, self }) {
+function LeaveTab({ employee, self, canRecord, session, onToast }) {
   const balances = useResource(() => (self ? fetchMyBalances() : fetchEmployeeBalances(employee.id)), [employee.id, self])
   const requests = useResource(
     () => (self ? fetchMyRequests({ type: 'LEAVE' }) : fetchRequests({ employeeId: employee.id, type: 'LEAVE', pageSize: 20 })),
     [employee.id, self],
   )
+  const [recording, setRecording] = useState(false)
   return (
     <div className="page">
       <Async loading={balances.loading} error={balances.error} onRetry={balances.reload} rows={2}>
@@ -330,7 +331,26 @@ function LeaveTab({ employee, self }) {
       <div>
         <div className="section-title">
           <h4>Leave requests</h4>
+          {canRecord && (
+            <button className="button button-secondary button-sm" onClick={() => setRecording(true)}>
+              <Plus size={14} /> Record leave
+            </button>
+          )}
         </div>
+        {canRecord && (
+          <RecordLeaveModal
+            open={recording}
+            employee={employee}
+            session={session}
+            onClose={() => setRecording(false)}
+            onRecorded={() => {
+              setRecording(false)
+              balances.reload()
+              requests.reload()
+            }}
+            onToast={onToast}
+          />
+        )}
         <Async loading={requests.loading} error={requests.error} onRetry={requests.reload} rows={3}>
           <DataTable
             columns={[

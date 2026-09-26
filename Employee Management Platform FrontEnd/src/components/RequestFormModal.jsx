@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ArrowUpRight, CalendarDays, FileText, Info, Plane, UserRound } from 'lucide-react'
 import { FormError, FormField, Modal, Spinner } from './ui.jsx'
+import { EmployeePicker } from './EmployeePicker.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { formatDate, todayIso } from '../lib/format.js'
 import { DOCUMENT_REQUEST_TYPES } from '../data.js'
 import {
+  approveRequest,
+  fetchEmployeeBalances,
   fetchLeaveTypes,
   previewLeave,
   submitDocumentRequest,
@@ -46,10 +49,40 @@ export default function RequestFormModal({ type, profile, balances = [], onClose
   )
 }
 
+/**
+ * HR records leave for someone else: a request that arrived by email or in
+ * person, or an absence that has already started. It is filed on the
+ * employee's behalf, so their notice period does not apply and past dates are
+ * allowed, and HR can approve it in the same step. Nobody records their own
+ * leave this way - that stays self-service, where the approval rules apply.
+ */
+export function RecordLeaveModal({ open, employee, session, onClose, onRecorded, onToast }) {
+  const [employeeId, setEmployeeId] = useState(employee?.id ?? '')
+  useEffect(() => {
+    if (open) setEmployeeId(employee?.id ?? '')
+  }, [open, employee?.id])
+
+  if (!open) return null
+  const isSelf = Boolean(employeeId) && employeeId === session?.employee?.id
+
+  return (
+    <Modal open={open} onClose={onClose} title="Record leave" eyebrow={employee?.fullName ?? 'On behalf of an employee'}>
+      {!employee && <EmployeePicker value={employeeId} onChange={setEmployeeId} />}
+      {isSelf && <p className="muted">Your own leave goes through My requests, so that someone else decides it.</p>}
+      {employeeId && !isSelf && (
+        <LeaveForm key={employeeId} employeeId={employeeId} onClose={onClose} onSubmitted={onRecorded} onToast={onToast} />
+      )}
+    </Modal>
+  )
+}
+
 // ---------------------------------------------------------------------------
 
-function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
+function LeaveForm({ balances = [], employeeId, onClose, onSubmitted, onToast }) {
+  const recording = Boolean(employeeId)
   const leaveTypes = useResource(() => fetchLeaveTypes(), [])
+  const theirBalances = useResource(() => (recording ? fetchEmployeeBalances(employeeId) : Promise.resolve([])), [employeeId])
+  const shownBalances = recording ? (theirBalances.data ?? []) : balances
   const [form, setForm] = useState({
     leaveTypeId: '',
     startDate: '',
@@ -58,6 +91,7 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
     halfDayEnd: false,
     reason: '',
     handoverNotes: '',
+    approveNow: true,
   })
   const [preview, setPreview] = useState(null)
   const [previewing, setPreviewing] = useState(false)
@@ -96,6 +130,7 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
           endDate: form.endDate,
           halfDayStart: form.halfDayStart,
           halfDayEnd: form.halfDayEnd,
+          employeeId: employeeId || undefined,
         })
         if (!cancelled) setPreview(result)
       } catch {
@@ -109,17 +144,18 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
       cancelled = true
       window.clearTimeout(timeout)
     }
-  }, [form.startDate, form.endDate, form.halfDayStart, form.halfDayEnd])
+  }, [form.startDate, form.endDate, form.halfDayStart, form.halfDayEnd, employeeId])
 
-  const selectedBalance = balances.find((balance) => balance.leaveTypeId === form.leaveTypeId)
+  const selectedBalance = shownBalances.find((balance) => balance.leaveTypeId === form.leaveTypeId)
   const selectedType = leaveTypes.data?.find((item) => item.id === form.leaveTypeId)
 
   const submit = async (event) => {
     event.preventDefault()
     setSaving(true)
     setError(null)
+    let request
     try {
-      const request = await submitLeaveRequest({
+      request = await submitLeaveRequest({
         leaveTypeId: form.leaveTypeId,
         startDate: form.startDate,
         endDate: form.endDate,
@@ -127,13 +163,30 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
         halfDayEnd: form.halfDayEnd,
         reason: form.reason,
         handoverNotes: form.handoverNotes || undefined,
+        employeeId: employeeId || undefined,
       })
-      onToast(`${request.reference} submitted — ${request.days} day(s) held pending approval.`)
-      onSubmitted()
     } catch (caught) {
       setError(caught)
       setSaving(false)
+      return
     }
+
+    const who = request.employee?.fullName ?? 'the employee'
+    if (!recording) {
+      onToast(`${request.reference} submitted — ${request.days} day(s) held pending approval.`)
+    } else if (!form.approveNow) {
+      onToast(`${request.reference} recorded for ${who} — ${request.days} day(s) waiting for a decision.`)
+    } else {
+      // Recorded either way; if the approval is refused the request simply
+      // stays pending, where it can be decided from Requests.
+      try {
+        await approveRequest(request.id, 'Recorded and approved by HR')
+        onToast(`${request.reference} approved — ${request.days} day(s) of leave for ${who}.`)
+      } catch (caught) {
+        onToast(`${request.reference} recorded but not approved: ${caught.message}`, 'error')
+      }
+    }
+    onSubmitted(request)
   }
 
   return (
@@ -166,11 +219,18 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
       </FormField>
 
       <div className="two-col">
+        {/* HR may record an absence that has already started; employees plan ahead. */}
         <FormField label="Start date" error={error?.fieldError?.('startDate')}>
-          <input type="date" min={todayIso()} value={form.startDate} onChange={(e) => set('startDate', e.target.value)} required />
+          <input type="date" min={recording ? undefined : todayIso()} value={form.startDate} onChange={(e) => set('startDate', e.target.value)} required />
         </FormField>
         <FormField label="End date" error={error?.fieldError?.('endDate')}>
-          <input type="date" min={form.startDate || todayIso()} value={form.endDate} onChange={(e) => set('endDate', e.target.value)} required />
+          <input
+            type="date"
+            min={form.startDate || (recording ? undefined : todayIso())}
+            value={form.endDate}
+            onChange={(e) => set('endDate', e.target.value)}
+            required
+          />
         </FormField>
       </div>
 
@@ -192,7 +252,7 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
         <div className="preview-note">
           <Info size={16} />
           <div>
-            <strong>Not counted against your balance</strong>
+            <strong>{recording ? 'Not counted against their balance' : 'Not counted against your balance'}</strong>
             <p>
               {preview.holidaysInRange.map((holiday) => `${holiday.name} (${formatDate(holiday.date, { year: undefined })})`).join(', ')}
             </p>
@@ -204,9 +264,18 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
         <textarea rows="2" value={form.reason} onChange={(e) => set('reason', e.target.value)} placeholder="Family holiday" required />
       </FormField>
 
-      <FormField label="Handover notes" hint="Optional — who is covering while you are away">
+      <FormField label="Handover notes" hint={recording ? 'Optional — who is covering while they are away' : 'Optional — who is covering while you are away'}>
         <textarea rows="2" value={form.handoverNotes} onChange={(e) => set('handoverNotes', e.target.value)} />
       </FormField>
+
+      {recording && (
+        <div className="checkbox-row">
+          <label>
+            <input type="checkbox" checked={form.approveNow} onChange={(e) => set('approveNow', e.target.checked)} />
+            <span>Approve it now — untick to leave the decision to their manager</span>
+          </label>
+        </div>
+      )}
 
       <FormError error={error} />
 
@@ -215,7 +284,8 @@ function LeaveForm({ balances, onClose, onSubmitted, onToast }) {
           Cancel
         </button>
         <button className="button button-primary" type="submit" disabled={saving}>
-          {saving ? <Spinner size={16} /> : <ArrowUpRight size={17} />} Submit request
+          {saving ? <Spinner size={16} /> : <ArrowUpRight size={17} />}{' '}
+          {!recording ? 'Submit request' : form.approveNow ? 'Record and approve' : 'Record leave'}
         </button>
       </div>
     </form>
