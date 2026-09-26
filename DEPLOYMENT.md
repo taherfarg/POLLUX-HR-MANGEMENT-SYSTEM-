@@ -212,6 +212,35 @@ with the demo accounts:
 
 ---
 
+## 6. On-site check-in by QR code (optional, 10 min)
+
+People at an office can be required to check in and out by scanning its QR code, from
+within a distance of the office and on its network. Everyone else keeps the button.
+
+1. **Work locations → Edit** the office → *On-site check-in*:
+   - tick *People here check in and out by scanning this location's QR code*;
+   - *QR code text*: any word (letters, digits, `- _ . ~`), or press *Generate a code*;
+   - *Office position*: in Google Maps, right-click the office and click the coordinates
+     to copy them, then paste (`25.204849, 55.270782`); *Allowed distance* 200 m is a safe start;
+   - *Office Wi-Fi name*: shown to anyone on the wrong network;
+   - on the office Wi-Fi, press **Add the network I'm on now** - once on each band if the
+     office has two - then **Save**.
+2. **Employees**: set *Work location* to the office for everyone who works there. Only
+   people assigned to it need the QR code.
+3. **QR code → Print**, and put it up at the entrance.
+4. **Test it** with a phone: on the office Wi-Fi, scan and check in - it works. Switch to
+   mobile data and scan again - it must say *Connect to the … Wi-Fi*.
+
+A web page cannot read the Wi-Fi name, so the network is recognised by the office's public
+internet address. If mobile data is **not** refused in step 4, or the address "Add the
+network I'm on now" shows differs from the office's own (compare with any "what is my IP"
+site on the same Wi-Fi), the proxy count is off: set `TRUST_PROXY` to `2` on
+**pollux-hr-api** → Environment, redeploy, and add the network again. If the office's
+internet provider ever changes its address, check-ins will be refused with *Connect to
+the … Wi-Fi* until HR adds the new one.
+
+---
+
 ## The free-tier caveat, stated plainly
 
 **Render free web services sleep after 15 minutes of inactivity.** The first request after that takes **roughly 50 seconds** while the container cold-starts — the login page will appear to hang.

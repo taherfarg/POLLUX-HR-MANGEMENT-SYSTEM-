@@ -83,7 +83,7 @@ src/
 ## Tests
 
 ```bash
-npm test        # 54 unit tests: API client, adapters, formatting, role navigation, audit diff, demo logins
+npm test        # 60 unit tests: API client, adapters, formatting, role navigation, audit diff, demo logins, on-site check-in
 npm run build
 ```
 

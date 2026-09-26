@@ -25,7 +25,7 @@ each judged against their own schedule, timezone and holiday calendar.
 | Area | Highlights |
 |---|---|
 | **People** | Employee file with tabs — Overview, Personal, Employment, Attendance, Leave, Salary, Advances, Payroll, Documents, Timeline — shown only to those allowed to see them. Departments, work locations (Dubai Office, Field, Remote) |
-| **Time** | One-tap check-in/out on the web or a phone; Present / Late / Partial / Absent / Missing check-out computed on the server in each person's own timezone; today board, timesheets, calendar; reusable work schedules; overtime from attendance with approval; HR corrections with a mandatory reason |
+| **Time** | One-tap check-in/out on the web or a phone — or, at an office that requires it, by scanning its QR code on site (position within a radius, office network), with the evidence kept; Present / Late / Partial / Absent / Missing check-out computed on the server in each person's own timezone; today board, timesheets, calendar; reusable work schedules; overtime from attendance with approval; HR corrections with a mandatory reason |
 | **Leave** | Requests with a live preview of the working days they cost; HR can record leave on someone's behalf, including leave that has already started, and approve it in one step; balances shown as *entitlement + carried − used − pending = available*; UAE holiday calendar by default, other calendars assigned per person |
 | **Payroll** | Monthly runs `Draft → Calculated → Reviewed → Approved → Paid` with four-eyes approval, month locking and admin-only reopen; salary advances repaid in instalments; bonuses and deductions; PDF payslips stored at approval |
 | **Reports** | Attendance, late arrivals, absence, overtime, leave, leave balance, payroll, salary advances, employees — preview on screen, export as CSV, Excel or PDF, every export audited |
@@ -134,9 +134,9 @@ preinstalled Chromium.
 
 | Suite | Result |
 |---|---|
-| Backend integration — Vitest + Supertest against PostgreSQL | **293 / 293** |
-| Frontend unit — client, adapters, formatting, navigation, audit diff, demo logins | **54 / 54** |
-| E2E — Playwright, real stack, 1440×900 and 390×844 | **24 / 24** |
+| Backend integration — Vitest + Supertest against PostgreSQL | **307 / 307** |
+| Frontend unit — client, adapters, formatting, navigation, audit diff, demo logins, on-site helpers | **60 / 60** |
+| E2E — Playwright, real stack, 1440×900 and 390×844 | **25 / 25** |
 | Typecheck · backend build · frontend build · migrations from empty + seed | clean |
 
 ## Stack
@@ -161,8 +161,9 @@ No new framework was introduced: Pollux HR was built by extending the
 ## Known limitations
 
 Payslips and reports are generated as PDF/Excel/CSV, but other documents are still
-metadata plus letter text (no general file upload yet) · attendance has no GPS or
-geofencing — the location is the assigned work location · no WPS/SIF bank file export
+metadata plus letter text (no general file upload yet) · on-site check-in trusts the
+browser's reported position, which developer tools can fake - the office network check is
+what cannot be faked from home, so use both · no WPS/SIF bank file export
 yet (payment is recorded with a reference) · end-of-service gratuity is not calculated ·
 rate limiting is in-process · public holidays are illustrative, since Islamic dates move
 with lunar observation.

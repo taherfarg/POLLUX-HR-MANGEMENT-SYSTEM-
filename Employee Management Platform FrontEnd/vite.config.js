@@ -24,5 +24,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    // One bundle for the whole app is ~500 kB (~140 kB gzipped) - fine for an
+    // HR tool used daily. Rarely used heavy parts (the QR code generator) load
+    // on demand instead.
+    chunkSizeWarningLimit: 600,
   },
 })

@@ -104,6 +104,8 @@ export async function fetchWorkLocations(includeInactive = false) {
 export const createWorkLocation = async (payload) => (await api.post('/work-locations', payload)).data
 export const updateWorkLocation = async (id, payload) => (await api.patch(`/work-locations/${id}`, payload)).data
 export const fetchWorkforceDistribution = async () => (await api.get('/work-locations/distribution')).data
+/** The network this browser reaches the API from, as the API sees it (HR only). */
+export const fetchMyNetwork = async () => (await api.get('/work-locations/my-network')).data
 
 export async function fetchWorkSchedules(includeInactive = false) {
   const response = await api.get('/work-schedules', { includeInactive: includeInactive ? 'true' : undefined })
@@ -310,8 +312,9 @@ export const generateLeaveBalances = async (payload) => (await api.post('/leave/
 
 // --- Attendance and overtime ----------------------------------------------
 
-export const checkIn = async (notes) => (await api.post('/attendance/check-in', { notes: notes || undefined })).data
-export const checkOut = async (notes) => (await api.post('/attendance/check-out', { notes: notes || undefined })).data
+/** `evidence` is the on-site proof a QR location asks for: { qrCode, latitude, longitude, accuracy, source }. */
+export const checkIn = async (notes, evidence = {}) => (await api.post('/attendance/check-in', { notes: notes || undefined, ...evidence })).data
+export const checkOut = async (notes, evidence = {}) => (await api.post('/attendance/check-out', { notes: notes || undefined, ...evidence })).data
 export const fetchAttendanceToday = async () => (await api.get('/attendance/today')).data
 
 export async function fetchAttendance(query = {}) {

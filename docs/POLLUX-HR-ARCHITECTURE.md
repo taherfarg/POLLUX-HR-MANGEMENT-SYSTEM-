@@ -134,6 +134,7 @@ Decisions worth knowing:
 | `20260925110000_pollux_payroll` | advances, instalments, payroll periods/records/items, adjustments, document files |
 | `20260925120000_pollux_payroll_sources` | source links from overtime, adjustments and instalments to payroll lines |
 | `20260925130000_pollux_attendance_start` | `attendanceStartDate` (backfilled to the migration date, so no history becomes "absent") |
+| `20260926100000_pollux_onsite_checkin` | On-site check-in: a location's QR code, position, radius, office networks and Wi-Fi name; the verification kept with each check-in and check-out |
 
 ---
 

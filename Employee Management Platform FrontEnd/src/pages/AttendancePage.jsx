@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlarmClock, CheckCircle2, Clock, Laptop, Palmtree, Pencil, Plus, RefreshCcw, UserX } from 'lucide-react'
+import { AlarmClock, CheckCircle2, Clock, Laptop, Palmtree, Pencil, Plus, QrCode, RefreshCcw, UserX } from 'lucide-react'
 import {
   Async,
   DataTable,
@@ -22,6 +22,7 @@ import { EmployeePicker } from '../components/EmployeePicker.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useDebouncedValue, useResource } from '../hooks/useResource.js'
 import { emitChange, useChangeListener } from '../lib/events.js'
+import { describeVerification } from '../lib/onsite.js'
 import { formatDateTime, formatDay, formatMinutes, monthBounds, currentMonthKey, todayIso } from '../lib/format.js'
 import {
   correctAttendanceRecord,
@@ -168,8 +169,8 @@ const dayColumns = (canManage, onEdit, onCreate, { withDate = false } = {}) => [
     ),
   },
   { key: 'schedule', label: 'Schedule', render: (row) => (row.scheduledStartLocal ? `${row.scheduledStartLocal}–${row.scheduledEndLocal}` : row.holidayName ?? '—') },
-  { key: 'checkIn', label: 'In', render: (row) => row.checkInLocal ?? '—' },
-  { key: 'checkOut', label: 'Out', render: (row) => row.checkOutLocal ?? '—' },
+  { key: 'checkIn', label: 'In', render: (row) => <ClockTime time={row.checkInLocal} verification={row.verification?.checkIn} /> },
+  { key: 'checkOut', label: 'Out', render: (row) => <ClockTime time={row.checkOutLocal} verification={row.verification?.checkOut} /> },
   { key: 'worked', label: 'Worked', className: 'num', render: (row) => (row.workedMinutes ? formatMinutes(row.workedMinutes) : row.isOpen ? formatMinutes(row.elapsedMinutes) : '—') },
   { key: 'late', label: 'Late', className: 'num', render: (row) => (row.lateMinutes ? formatMinutes(row.lateMinutes) : '—') },
   { key: 'overtime', label: 'Overtime', className: 'num', render: (row) => (row.overtimeMinutes ? formatMinutes(row.overtimeMinutes) : '—') },
@@ -426,6 +427,18 @@ function ManualForm({ initial, onCancel, onSaved }) {
   )
 }
 
+/** A check-in or check-out time, marked when it was verified on site by QR code. */
+function ClockTime({ time, verification }) {
+  if (!time) return '—'
+  if (!verification) return time
+  const description = describeVerification(verification)
+  return (
+    <span className="clock-time" title={description}>
+      {time} <QrCode size={13} aria-label={description} />
+    </span>
+  )
+}
+
 function CorrectionForm({ day, onCancel, onSaved }) {
   const [form, setForm] = useState({
     checkIn: day.checkInLocal ?? '',
@@ -455,6 +468,15 @@ function CorrectionForm({ day, onCancel, onSaved }) {
           <Pencil size={16} />
           <span>
             Last corrected {formatDateTime(day.correction.correctedAt)}: {day.correction.reason}
+          </span>
+        </div>
+      )}
+      {day.verification && (
+        <div className="notice">
+          <QrCode size={16} />
+          <span>
+            {day.verification.checkIn && <>Checked in by {describeVerification(day.verification.checkIn)}. </>}
+            {day.verification.checkOut && <>Checked out by {describeVerification(day.verification.checkOut)}.</>}
           </span>
         </div>
       )}

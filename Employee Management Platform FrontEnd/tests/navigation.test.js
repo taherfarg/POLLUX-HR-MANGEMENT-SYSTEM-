@@ -52,7 +52,18 @@ describe('navigation by role', () => {
 
   it('gives an employee only their own pages', () => {
     const pages = [...allowedPages(sessions.employee)].sort()
-    expect(pages).toEqual(['home', 'my-attendance', 'my-documents', 'my-pay', 'my-profile', 'my-requests'])
+    expect(pages).toEqual(['check-in', 'home', 'my-attendance', 'my-documents', 'my-pay', 'my-profile', 'my-requests'])
+  })
+
+  it('opens the QR check-in page for anyone who checks in, without listing it', () => {
+    for (const session of Object.values(sessions)) {
+      expect(allowedPages(session).has('check-in')).toBe(true)
+      const listed = navigationFor(session).flatMap((group) => group.items.map((entry) => entry.id))
+      expect(listed).not.toContain('check-in')
+    }
+    // An account with no employee record never checks in.
+    expect(allowedPages({ ...sessions.admin, employee: null }).has('check-in')).toBe(false)
+    expect(locatePage(sessions.employee, 'check-in')).toEqual({ group: null, label: 'Check in' })
   })
 
   it('lands management on the dashboard and everyone else at home', () => {

@@ -136,6 +136,36 @@ My attendance (web or phone).
 - Refused when the date is inside an approved payroll month (the month lock).
 - Working on a rest day or holiday is allowed and produces rest-day overtime.
 
+### On-site check-in (QR code)
+
+A work location can require people assigned to it to check in **and** out on site
+(Work locations → Edit → *On-site check-in*). The rule lives on the location, so remote
+and field colleagues keep the one-tap button. [`services/onsite.ts`](../Employee%20Management%20Platform%20BackEnd/src/services/onsite.ts)
+decides, with no database or clock, from three signals:
+
+| Signal | How it is checked | Set by HR as |
+|---|---|---|
+| **QR code** | The printed code opens `#/check-in/<code>`; the code is compared in constant time | *QR code text* (letters, digits, `- _ . ~`); change it to retire printed copies |
+| **Position** | The browser's position (asked fresh at the tap) must be within the radius of the office, by great-circle distance | *Office position* (`lat, lng`) and *Allowed distance* (default 200 m) |
+| **Office network** | The request's public IP must fall in one of the office's addresses or ranges (IPv4, IPv6 `/64`) | *Office network*, filled by "Add the network I'm on now" while on the office Wi-Fi |
+
+- **Why not the Wi-Fi name?** No web page can read it — browsers keep the SSID private.
+  Every device on the office Wi-Fi reaches the internet through the office's public
+  address, so that address stands for the network. On mobile data it does not match.
+- A location that requires QR check-in must also have a position or a network: a code
+  alone can be photographed and used from anywhere. In production a private address
+  (10.x, 192.168.x, …) is refused as an office network — seeing one means the server is
+  reading its proxy, not the visitor.
+- The client IP comes from `X-Forwarded-For` through exactly `TRUST_PROXY` hops (1 on
+  Render), never "trust everything", so a visitor cannot claim the office's address.
+- An accepted check-in or check-out stores its evidence on the record
+  (`checkInVerification` / `checkOutVerification`: distance, accuracy, position, network,
+  IP) — shown to HR and the employee, marked with a QR icon in the register.
+- A refused attempt is answered with the reason (too far, wrong network, no position,
+  wrong code) and audited as `REJECT` on `AttendanceRecord`, without the code.
+- `GET /attendance/today` tells the card that a QR code is needed (`onSite`), never the
+  code; the card then says "Scan the QR code at …" instead of offering a button.
+
 ## 7. Corrections — HR only, always audited
 
 `POST /attendance` (record a missing day), `PATCH /attendance/:id` (fix times or status)
@@ -167,7 +197,8 @@ no longer change.
 
 | Screen | For | Shows |
 |---|---|---|
-| Home — "Today's attendance" card + top-bar button | everyone with an employee record | local date and time, schedule, worked, late, one-tap check-in/out |
+| Home — "Today's attendance" card + top-bar button | everyone with an employee record | local date and time, schedule, worked, late, one-tap check-in/out — or, at a QR location, "Scan the QR code at …" |
+| Check in (`#/check-in/<code>`, opened by the office QR code) | people at a QR location | the scanned code, the position being found, the Wi-Fi to use, and one Check in / Check out button |
 | My attendance | everyone | month calendar, day list, totals |
 | Attendance → Today | HR (company), manager (team) | every person's status now, in their own timezone, counts, missing check-outs |
 | Attendance → Register | HR | stored records with filters; correct or record a day |
@@ -182,3 +213,5 @@ no longer change.
 | `tests/timezone.test.ts` | local dates and DST (Dubai, Cairo, Algiers) |
 | `tests/attendance.test.ts` | check-in/out end to end, one record per day, leave and lock refusals, corrections with reasons and audit, virtual days, `attendanceStartDate`, who sees what |
 | `e2e/tests/attendance.spec.js` | a remote employee checks in and out from the browser in Africa/Algiers; employees cannot board or correct; HR corrections need a reason |
+| `tests/onsite.test.ts` | distance, IPv4/IPv6 network matching, private addresses; a QR location refuses the plain button, a wrong code, a distant position and another network (each audited), accepts on site and keeps the evidence; HR alone sees the code |
+| `e2e/tests/onsite.spec.js` | HR sets up a QR location and prints its code; the employee is refused 2 km away and with a wrong code, then checks in on site from the QR link |

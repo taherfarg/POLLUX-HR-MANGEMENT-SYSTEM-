@@ -78,6 +78,7 @@ stops the process with a readable message.
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL_DAYS` | no | `15m` / `7` |
 | `CORS_ORIGINS` | no | Comma-separated browser origins |
 | `RATE_LIMIT_AUTH_MAX` / `RATE_LIMIT_API_MAX` | no | Per IP: 10 sign-in attempts per 15 min / 300 requests per minute |
+| `TRUST_PROXY` | no | Proxy hops in front of the API, for reading the visitor's IP (default `1`, right for Render). The office-network check and the rate limiter depend on it; Work locations → "Add the network I'm on now" shows the address it yields |
 | `SEED_DEMO_PASSWORD` | no | Password of the seeded demo logins (default `Passw0rd!23`, demo only) |
 | `GOOGLE_API_KEY` | no | AI letter drafting; templates are used without it |
 | `LOG_LEVEL`, `PORT`, `NODE_ENV` | no | |
@@ -222,7 +223,8 @@ HR_ADMIN.
 | GET | `/employees/:id/timeline` · `/reports` · `/leave-balances` · `/documents` | |
 | GET · POST | `/employees/:id/compensation` | Self or HR to read (HR reading is audited); HR to write |
 | GET · POST · PATCH | `/departments` | |
-| GET · POST · PATCH | `/work-locations`, `GET /work-locations/distribution` | Dubai Office, Field, Remote… with timezone |
+| GET · POST · PATCH | `/work-locations`, `GET /work-locations/distribution` | Dubai Office, Field, Remote… with timezone, and the on-site check-in rule (QR code, position and radius, office networks, Wi-Fi name) - the rule's details for HR only |
+| GET | `/work-locations/my-network` | HR: the caller's IP as the API sees it, and the entry to store for it |
 | GET · POST · PATCH | `/work-schedules`, `GET /work-schedules/:id`, `POST /work-schedules/:id/assign` | Per-day start, end, break; bulk assignment |
 | GET · POST · PATCH | `/holiday-calendars` | UAE default; others assigned per employee |
 | GET · POST · PATCH | `/legal-entities` | Kept for internal use; not in the Pollux UI |
@@ -233,7 +235,7 @@ HR_ADMIN.
 
 | Method | Path | Who / notes |
 |---|---|---|
-| POST | `/attendance/check-in` · `/attendance/check-out` | Self. Server time; one record per local day; refused on leave or in a locked month |
+| POST | `/attendance/check-in` · `/attendance/check-out` | Self. Server time; one record per local day; refused on leave or in a locked month. At a QR location: `qrCode`, `latitude`, `longitude`, `accuracy` required, checked on site; refusals audited |
 | GET | `/attendance/today` · `/me/attendance/today` | Own day with schedule, status, can check in/out |
 | GET | `/me/attendance` | Own days (stored + evaluated) for a range, with totals |
 | GET | `/attendance` | List: self, manager's team, or HR's scope |
@@ -360,7 +362,7 @@ tracked from the day after setup. Walkthrough: [DEPLOYMENT.md, step 4a](../DEPLO
 TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?schema=public npm test
 ```
 
-**293 tests across 15 files**, against a real PostgreSQL test database:
+**307 tests across 16 files**, against a real PostgreSQL test database:
 
 | File | Covers |
 |---|---|
@@ -376,6 +378,7 @@ TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?sc
 | `payroll.test.ts` | Advances, adjustments, the payroll lifecycle, four-eyes, locking, payslips |
 | `administration.test.ts` | Users & roles, leave balances, reports, document library, dashboards per role |
 | `clean-start.test.ts` | `db:setup`: reading the accounts, the result, sign-in, single-approver payroll, the wipe guard |
+| `onsite.test.ts` | On-site check-in: distance, network matching, private addresses; QR code, position and network enforced on check-in and check-out; refusals audited; the code hidden from all but HR |
 | `report-export.test.ts` | CSV/Excel/PDF writers, formula-injection neutralising |
 | `working-days.test.ts` | Leave day counting |
 
@@ -397,7 +400,7 @@ checkout against the hosted database (the production image ships compiled code o
 ## Known limitations
 
 - **Documents other than payslips are metadata plus letter text** — no general upload.
-- **No GPS or geofencing** on check-in; the location is the assigned work location.
+- **On-site check-in trusts the browser's position**, which developer tools can fake; the office-network check is the part that cannot be faked from home, so a QR location should use both.
 - **No WPS/SIF bank file** yet; payment is recorded with a reference.
 - **End-of-service gratuity** is not calculated.
 - **Public holidays are illustrative** — Islamic dates move with lunar observation.

@@ -18,10 +18,21 @@ const FILTERABLE_STATUSES = [...ATTENDANCE_STATUSES, 'SCHEDULED', 'NOT_CHECKED_I
 
 const clockSchema = z.string().trim().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, 'Use a 24-hour time such as 09:15');
 
-export const checkInSchema = z.object({
-  notes: optionalTrimmedString(300),
-  source: z.enum(['WEB', 'MOBILE']).default('WEB'),
-});
+export const checkInSchema = z
+  .object({
+    notes: optionalTrimmedString(300),
+    source: z.enum(['WEB', 'MOBILE']).default('WEB'),
+    // On-site evidence, for a location that requires it: the scanned QR code
+    // and the position the browser reports.
+    qrCode: z.string().trim().max(200).optional(),
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional(),
+    accuracy: z.coerce.number().min(0).max(1_000_000).optional(),
+  })
+  .refine((value) => (value.latitude === undefined) === (value.longitude === undefined), {
+    message: 'Send both latitude and longitude',
+    path: ['latitude'],
+  });
 
 export const checkOutSchema = checkInSchema;
 

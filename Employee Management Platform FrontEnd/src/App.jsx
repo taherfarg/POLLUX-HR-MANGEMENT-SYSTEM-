@@ -42,6 +42,7 @@ import MyRequestsPage from './pages/MyRequestsPage.jsx'
 import MyPayPage from './pages/MyPayPage.jsx'
 import MyProfilePage from './pages/MyProfilePage.jsx'
 import MyTeamPage from './pages/MyTeamPage.jsx'
+import CheckInPage from './pages/CheckInPage.jsx'
 
 const PAGE_COMPONENTS = {
   dashboard: DashboardPage,
@@ -68,6 +69,7 @@ const PAGE_COMPONENTS = {
   'my-attendance': MyAttendancePage,
   'my-requests': MyRequestsPage,
   'my-pay': MyPayPage,
+  'check-in': CheckInPage,
   'my-documents': DocumentsPage,
   'my-profile': MyProfilePage,
   'my-team': MyTeamPage,

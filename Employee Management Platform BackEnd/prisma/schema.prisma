@@ -426,6 +426,23 @@ model WorkLocation {
   /// Null for a REMOTE location - each remote employee carries their own zone.
   timezone      String?
   isActive      Boolean          @default(true)
+
+  // --- On-site check-in ------------------------------------------------------
+  /// People assigned here check in and out by scanning the location's QR code,
+  /// and only from inside the geofence and/or on the office network.
+  qrCheckInRequired    Boolean  @default(false)
+  /// The text the printed QR code carries. Entered by HR, never in the code.
+  qrCode               String?
+  latitude             Decimal? @db.Decimal(9, 6)
+  longitude            Decimal? @db.Decimal(9, 6)
+  geofenceRadiusMeters Int      @default(200)
+  /// Public IP addresses or CIDR ranges of the office internet connection -
+  /// what every device on the office Wi-Fi reaches the internet through.
+  allowedNetworks      String[] @default([])
+  /// The Wi-Fi name(s) to show people who are not on the office network. A
+  /// web page cannot read the network name itself; the check is the address.
+  wifiName             String?
+
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
@@ -865,6 +882,10 @@ model AttendanceRecord {
   checkOut          DateTime?         @db.Timestamptz(3)
   checkInSource     AttendanceSource?
   checkOutSource    AttendanceSource?
+  /// How an on-site check-in or check-out was verified: QR code, distance from
+  /// the location, office network. Null for a plain check-in or an HR entry.
+  checkInVerification  Json?
+  checkOutVerification Json?
   dayType           AttendanceDayType @default(WORKING_DAY)
   scheduleId        String?
   scheduledStart    DateTime?         @db.Timestamptz(3)

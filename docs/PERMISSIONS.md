@@ -45,6 +45,8 @@ HR admin. Every "HR" cell below means *HR within their scope*.
 | Leave requests | own (submit, withdraw) | reports (approve/reject) | ✔ | ✔ |
 | Leave balances | own | own + reports | read, generate year, adjust (reason required) | same |
 | Holidays, calendars, schedules, locations, departments | read | read | manage | manage |
+| A location's on-site check-in rule — QR code, office position, office networks | ✖ (only that a QR code is needed) | ✖ (same) | manage | manage |
+| How a check-in was verified (distance, network, IP) | own | ✖ | everyone | same |
 | **Salary advances** | own (request, withdraw while pending) | own only — **never the team's** | approve, reject, mark paid, reschedule, cancel | same |
 | **Payroll runs, records, adjustments** | ✖ | **✖** | create, calculate, review, approve¹, mark paid, cancel | same, plus **reopen** |
 | **Payslips (PDF)** | own | own only | ✔ | ✔ |

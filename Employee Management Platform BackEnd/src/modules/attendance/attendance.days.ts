@@ -318,6 +318,11 @@ export function serializeDay(
       options.includeCorrection && record?.correctedAt
         ? { reason: record.correctionReason, correctedAt: record.correctedAt }
         : null,
+    // How an on-site check-in was verified - for HR and the employee, like a correction.
+    verification:
+      options.includeCorrection && (record?.checkInVerification || record?.checkOutVerification)
+        ? { checkIn: record.checkInVerification ?? null, checkOut: record.checkOutVerification ?? null }
+        : null,
     ...(options.employee ? { employee: options.employee } : {}),
   };
 }

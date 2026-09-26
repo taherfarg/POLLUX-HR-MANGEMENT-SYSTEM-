@@ -2,14 +2,40 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { optionalTrimmedString, requiredTrimmedString } from '../../common/validate';
-import { ConflictError, NotFoundError } from '../../common/errors';
+import { ConflictError, NotFoundError, ValidationError } from '../../common/errors';
 import type { AuthContext } from '../../common/auth-context';
+import { env } from '../../config/env';
 import { assertCanManageEntityConfig, entityScopeWhere, isManagement, scopedEntityId } from '../../services/access';
 import { recordAudit, type AuditInput } from '../../services/audit.service';
 import { resolveLegalEntityId } from '../../services/company';
+import { isPrivateAddress, normalizeIp, parseNetworkEntry, suggestNetworkEntry } from '../../services/onsite';
 import { timeZoneSchema } from '../settings/settings.schema';
 
 type Fingerprint = Pick<AuditInput, 'ipAddress' | 'userAgent'>;
+
+const networkEntrySchema = z
+  .string()
+  .trim()
+  .max(64)
+  .refine((value) => parseNetworkEntry(value) !== null, 'Use an IP address such as 203.0.113.7, or a range such as 203.0.113.0/24');
+
+/** On-site check-in: the QR code, the geofence and the office network. */
+const onsiteFields = {
+  qrCheckInRequired: z.boolean(),
+  // It travels inside a link, so only URL-safe characters.
+  qrCode: z
+    .string()
+    .trim()
+    .min(4, 'Use at least 4 characters')
+    .max(100)
+    .regex(/^[A-Za-z0-9._~-]+$/, 'Use letters, digits and - _ . ~ only')
+    .nullable(),
+  latitude: z.coerce.number().min(-90).max(90).nullable(),
+  longitude: z.coerce.number().min(-180).max(180).nullable(),
+  geofenceRadiusMeters: z.coerce.number().int().min(25, 'At least 25 m - phone positions are rarely closer').max(5000),
+  allowedNetworks: z.array(networkEntrySchema).max(20),
+  wifiName: z.string().trim().max(120).nullable(),
+};
 
 export const workLocationSchema = z.object({
   legalEntityId: optionalTrimmedString(40),
@@ -22,6 +48,7 @@ export const workLocationSchema = z.object({
   countryName: optionalTrimmedString(80),
   timezone: timeZoneSchema.optional(),
   isActive: z.boolean().default(true),
+  ...z.object(onsiteFields).partial().shape,
 });
 
 export const updateWorkLocationSchema = workLocationSchema
@@ -35,7 +62,11 @@ export type UpdateWorkLocationInput = z.infer<typeof updateWorkLocationSchema>;
 
 type LocationRow = Prisma.WorkLocationGetPayload<object>;
 
-function serialize(location: LocationRow, headcount?: number) {
+/**
+ * Everyone may know that a location checks in by QR code; only HR sees the
+ * code, the office position and the office networks.
+ */
+function serialize(location: LocationRow, options: { headcount?: number; includeOnsite: boolean }) {
   return {
     id: location.id,
     legalEntityId: location.legalEntityId,
@@ -48,8 +79,78 @@ function serialize(location: LocationRow, headcount?: number) {
     countryName: location.countryName,
     timezone: location.timezone,
     isActive: location.isActive,
-    ...(headcount === undefined ? {} : { headcount }),
+    qrCheckInRequired: location.qrCheckInRequired,
+    ...(options.includeOnsite
+      ? {
+          qrCode: location.qrCode,
+          latitude: location.latitude === null ? null : Number(location.latitude),
+          longitude: location.longitude === null ? null : Number(location.longitude),
+          geofenceRadiusMeters: location.geofenceRadiusMeters,
+          allowedNetworks: location.allowedNetworks,
+          wifiName: location.wifiName,
+        }
+      : {}),
+    ...(options.headcount === undefined ? {} : { headcount: options.headcount }),
   };
+}
+
+interface OnsiteSettings {
+  qrCheckInRequired: boolean;
+  qrCode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  allowedNetworks: string[];
+}
+
+/**
+ * The on-site rule has to be usable once saved: a QR code to scan, and a
+ * second signal besides - a printed code alone can be photographed and used
+ * from anywhere. In production an office network must be a public address; a
+ * private one would mean the server reads its proxy, and would let anyone in.
+ */
+function assertOnsiteUsable(settings: OnsiteSettings): void {
+  const errors: Record<string, string[]> = {};
+  if ((settings.latitude === null) !== (settings.longitude === null)) {
+    errors.latitude = ['Enter both the latitude and the longitude, or neither'];
+  }
+  if (settings.qrCheckInRequired) {
+    if (!settings.qrCode) errors.qrCode = ['Set the code the printed QR carries'];
+    if (settings.latitude === null && settings.allowedNetworks.length === 0) {
+      errors.qrCheckInRequired = [
+        'Add the office position or its network as well - a QR code alone can be photographed and used from anywhere',
+      ];
+    }
+  }
+  if (env.isProduction) {
+    const privateEntry = settings.allowedNetworks.find((entry) => isPrivateAddress(parseNetworkEntry(entry)?.address));
+    if (privateEntry) {
+      errors.allowedNetworks = [`${privateEntry} is a private address, not the office's public internet address`];
+    }
+  }
+  if (Object.keys(errors).length > 0) throw new ValidationError('Validation failed', errors);
+}
+
+const uniqueNetworks = (entries: string[]) => [...new Set(entries.map((entry) => entry.trim()))];
+
+/** What the audit trail records about the on-site rule - never the code itself. */
+function onsiteAudit(location: LocationRow) {
+  return {
+    qrCheckInRequired: location.qrCheckInRequired,
+    hasQrCode: Boolean(location.qrCode),
+    latitude: location.latitude === null ? null : Number(location.latitude),
+    longitude: location.longitude === null ? null : Number(location.longitude),
+    geofenceRadiusMeters: location.geofenceRadiusMeters,
+    allowedNetworks: location.allowedNetworks,
+  };
+}
+
+/**
+ * The address this request reaches the API from, and the entry to store for
+ * it. Pressed while on the office Wi-Fi, this is the office's own network.
+ */
+export function describeCallerNetwork(ip: string | null | undefined): { ip: string | null; entry: string | null; isPrivate: boolean } {
+  const address = normalizeIp(ip);
+  return { ip: address, entry: suggestNetworkEntry(address), isPrivate: isPrivateAddress(address) };
 }
 
 /**
@@ -74,7 +175,9 @@ export async function listWorkLocations(auth: AuthContext, options: { includeIna
   });
   const countByLocation = new Map(counts.map((row) => [row.workLocationId, row._count._all]));
 
-  return locations.map((location) => serialize(location, countByLocation.get(location.id) ?? 0));
+  return locations.map((location) =>
+    serialize(location, { headcount: countByLocation.get(location.id) ?? 0, includeOnsite: isManagement(auth) }),
+  );
 }
 
 /**
@@ -128,6 +231,15 @@ export async function createWorkLocation(
   const existing = await prisma.workLocation.findUnique({ where: { code: input.code }, select: { id: true } });
   if (existing) throw new ConflictError(`A work location with code ${input.code} already exists`);
 
+  const allowedNetworks = uniqueNetworks(input.allowedNetworks ?? []);
+  assertOnsiteUsable({
+    qrCheckInRequired: input.qrCheckInRequired ?? false,
+    qrCode: input.qrCode ?? null,
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
+    allowedNetworks,
+  });
+
   const location = await prisma.workLocation.create({
     data: {
       legalEntityId,
@@ -140,6 +252,13 @@ export async function createWorkLocation(
       countryName: input.countryName ?? null,
       timezone: input.timezone ?? null,
       isActive: input.isActive,
+      qrCheckInRequired: input.qrCheckInRequired ?? false,
+      qrCode: input.qrCode ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      geofenceRadiusMeters: input.geofenceRadiusMeters ?? 200,
+      allowedNetworks,
+      wifiName: input.wifiName || null,
     },
   });
 
@@ -149,11 +268,12 @@ export async function createWorkLocation(
     entityId: location.id,
     legalEntityId,
     summary: `Created work location ${location.name} (${location.kind.toLowerCase()})`,
+    after: onsiteAudit(location),
     actor: auth,
     ...fingerprint,
   });
 
-  return serialize(location, 0);
+  return serialize(location, { headcount: 0, includeOnsite: true });
 }
 
 export async function updateWorkLocation(
@@ -166,6 +286,17 @@ export async function updateWorkLocation(
   if (!existing) throw new NotFoundError('Work location');
   assertCanManageEntityConfig(auth, existing.legalEntityId);
 
+  // Validated as the location will be once saved: the update merged onto what is stored.
+  const allowedNetworks = input.allowedNetworks === undefined ? undefined : uniqueNetworks(input.allowedNetworks);
+  const pick = <T,>(next: T | undefined, current: T) => (next === undefined ? current : next);
+  assertOnsiteUsable({
+    qrCheckInRequired: pick(input.qrCheckInRequired, existing.qrCheckInRequired),
+    qrCode: pick(input.qrCode, existing.qrCode),
+    latitude: pick(input.latitude, existing.latitude === null ? null : Number(existing.latitude)),
+    longitude: pick(input.longitude, existing.longitude === null ? null : Number(existing.longitude)),
+    allowedNetworks: pick(allowedNetworks, existing.allowedNetworks),
+  });
+
   const location = await prisma.workLocation.update({
     where: { id: locationId },
     data: {
@@ -177,6 +308,13 @@ export async function updateWorkLocation(
       countryName: input.countryName,
       timezone: input.timezone,
       isActive: input.isActive,
+      qrCheckInRequired: input.qrCheckInRequired,
+      qrCode: input.qrCode,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      geofenceRadiusMeters: input.geofenceRadiusMeters,
+      allowedNetworks,
+      wifiName: input.wifiName === undefined ? undefined : input.wifiName || null,
     },
   });
 
@@ -186,11 +324,18 @@ export async function updateWorkLocation(
     entityId: locationId,
     legalEntityId: existing.legalEntityId,
     summary: `Updated work location ${location.name}`,
-    before: { name: existing.name, kind: existing.kind, timezone: existing.timezone, isActive: existing.isActive },
-    after: { name: location.name, kind: location.kind, timezone: location.timezone, isActive: location.isActive },
+    before: { name: existing.name, kind: existing.kind, timezone: existing.timezone, isActive: existing.isActive, ...onsiteAudit(existing) },
+    after: {
+      name: location.name,
+      kind: location.kind,
+      timezone: location.timezone,
+      isActive: location.isActive,
+      ...onsiteAudit(location),
+      ...(existing.qrCode !== location.qrCode ? { qrCodeChanged: true } : {}),
+    },
     actor: auth,
     ...fingerprint,
   });
 
-  return serialize(location);
+  return serialize(location, { includeOnsite: true });
 }

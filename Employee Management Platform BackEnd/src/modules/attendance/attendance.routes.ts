@@ -28,7 +28,7 @@ attendanceRouter.post(
   '/check-in',
   asyncHandler(async (req: Request, res: Response) => {
     const input = parseBody(req, checkInSchema);
-    sendCreated(res, await attendance.checkIn(requireAuth(req), input));
+    sendCreated(res, await attendance.checkIn(requireAuth(req), input, new Date(), auditContextFromRequest(req)));
   }),
 );
 
@@ -36,7 +36,7 @@ attendanceRouter.post(
   '/check-out',
   asyncHandler(async (req: Request, res: Response) => {
     const input = parseBody(req, checkOutSchema);
-    sendData(res, await attendance.checkOut(requireAuth(req), input));
+    sendData(res, await attendance.checkOut(requireAuth(req), input, new Date(), auditContextFromRequest(req)));
   }),
 );
 

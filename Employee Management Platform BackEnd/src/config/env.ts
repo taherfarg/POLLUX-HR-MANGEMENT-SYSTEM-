@@ -41,6 +41,15 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_API_MAX: z.coerce.number().int().positive().default(300),
+
+  /**
+   * How many proxies sit in front of the API, for reading the visitor's IP from
+   * X-Forwarded-For: `1` on Render. The office-network check and the rate
+   * limiter depend on it; Work locations -> "Add the network I'm on" shows the
+   * address it produces, to confirm it is the office's own. A count, never
+   * "trust everything": that would let a visitor claim any address.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(1),
 });
 
 /**

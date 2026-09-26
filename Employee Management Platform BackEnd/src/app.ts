@@ -17,8 +17,9 @@ export function createApp(): Express {
   const app = express();
 
   // Behind a platform proxy (Render, Railway, Fly), the client IP the rate
-  // limiter and audit trail record comes from X-Forwarded-For.
-  app.set('trust proxy', 1);
+  // limiter, the audit trail and the office-network check use comes from
+  // X-Forwarded-For. TRUST_PROXY is the number of proxy hops: 1 on Render.
+  app.set('trust proxy', env.TRUST_PROXY);
   app.disable('x-powered-by');
 
   app.use(helmet());

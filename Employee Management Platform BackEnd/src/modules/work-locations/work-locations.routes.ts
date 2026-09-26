@@ -6,6 +6,7 @@ import { authenticate, requireAdmin, requireAuth } from '../../middleware/authen
 import { auditContextFromRequest } from '../../services/audit.service';
 import {
   createWorkLocation,
+  describeCallerNetwork,
   getWorkforceDistribution,
   listWorkLocations,
   updateWorkLocation,
@@ -37,6 +38,18 @@ workLocationsRouter.get(
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     sendData(res, await getWorkforceDistribution(requireAuth(req)));
+  }),
+);
+
+/**
+ * The network this request comes from, as the API sees it. HR presses "Add the
+ * network I'm on" while connected to the office Wi-Fi to register the office.
+ */
+workLocationsRouter.get(
+  '/my-network',
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    sendData(res, describeCallerNetwork(req.ip));
   }),
 );
 

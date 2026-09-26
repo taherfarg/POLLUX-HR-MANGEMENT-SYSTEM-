@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogIn, LogOut } from 'lucide-react'
+import { LogIn, LogOut, QrCode } from 'lucide-react'
 import { ErrorState, LoadingState, Spinner, StatusPill } from './ui.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { emitChange, useChangeListener } from '../lib/events.js'
@@ -63,6 +63,8 @@ export function ClockButton({ onToast }) {
   // Hidden for people who never check in; shown before tracking starts, when
   // check-ins are already recorded.
   if (status === 'NOT_TRACKED' && !data.trackingStartsOn) return null
+  // Where the office QR code is required, the home card says how instead.
+  if (data.onSite?.required) return null
 
   if (data.canCheckOut) {
     return (
@@ -142,15 +144,31 @@ export function CheckInCard({ onToast }) {
         </p>
       )}
       <div className="button-row">
-        {data.canCheckIn && (
-          <button className="button button-primary" onClick={() => run('in')} disabled={busy}>
-            {busy ? <Spinner size={16} /> : <LogIn size={16} />} Check in
-          </button>
-        )}
-        {data.canCheckOut && (
-          <button className="button button-primary" onClick={() => run('out')} disabled={busy}>
-            {busy ? <Spinner size={16} /> : <LogOut size={16} />} Check out
-          </button>
+        {data.onSite?.required ? (
+          // The office decides where check-in happens: the QR code on its wall
+          // opens the check-in page, with this device's position.
+          (data.canCheckIn || data.canCheckOut) && (
+            <p className="onsite-hint">
+              <QrCode size={16} />
+              <span>
+                Scan the QR code at {data.onSite.locationName} to check {data.canCheckOut ? 'out' : 'in'}
+                {data.onSite.needsNetwork ? `, connected to ${data.onSite.wifiName ?? 'the office Wi-Fi'}` : ''}.
+              </span>
+            </p>
+          )
+        ) : (
+          <>
+            {data.canCheckIn && (
+              <button className="button button-primary" onClick={() => run('in')} disabled={busy}>
+                {busy ? <Spinner size={16} /> : <LogIn size={16} />} Check in
+              </button>
+            )}
+            {data.canCheckOut && (
+              <button className="button button-primary" onClick={() => run('out')} disabled={busy}>
+                {busy ? <Spinner size={16} /> : <LogOut size={16} />} Check out
+              </button>
+            )}
+          </>
         )}
         <span className="small" style={{ color: '#93a4c2' }}>
           {data.schedule?.name}

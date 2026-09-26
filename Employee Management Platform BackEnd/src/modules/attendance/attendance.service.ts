@@ -12,6 +12,7 @@ import {
 } from '../../services/access';
 import { recordAudit, type AuditInput } from '../../services/audit.service';
 import { notifyEmployee } from '../../services/notification.service';
+import { verifyOnsite, type OnsiteEvidence, type OnsitePolicy, type OnsiteVerification } from '../../services/onsite';
 import { assertPayrollPeriodOpen } from '../../services/payroll-lock';
 import { clockToMinutes, minutesBetween, zonedClock, zonedDateKey, zonedWallTimeToUtc } from '../../services/timezone';
 import { loadWorkContext, type EmployeeWorkContext } from '../../services/work-context';
@@ -100,6 +101,81 @@ function dayFromRecord(context: EmployeeWorkContext, plan: DayPlan, record: Atte
 }
 
 // ---------------------------------------------------------------------------
+// On-site check-in
+// ---------------------------------------------------------------------------
+
+type ClockInput = { notes?: string; source: 'WEB' | 'MOBILE' } & OnsiteEvidence;
+
+const NO_FINGERPRINT: Fingerprint = { ipAddress: null, userAgent: null };
+
+/** The on-site rule of the location the employee is assigned to, if it has one. */
+export async function onsitePolicyFor(employeeId: string): Promise<OnsitePolicy | null> {
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: {
+      workLocation: {
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+          qrCheckInRequired: true,
+          qrCode: true,
+          latitude: true,
+          longitude: true,
+          geofenceRadiusMeters: true,
+          allowedNetworks: true,
+          wifiName: true,
+        },
+      },
+    },
+  });
+  const location = employee?.workLocation;
+  if (!location || !location.isActive || !location.qrCheckInRequired) return null;
+  return {
+    locationId: location.id,
+    locationName: location.name,
+    qrCode: location.qrCode,
+    latitude: location.latitude === null ? null : Number(location.latitude),
+    longitude: location.longitude === null ? null : Number(location.longitude),
+    radiusMeters: location.geofenceRadiusMeters,
+    allowedNetworks: location.allowedNetworks,
+    wifiName: location.wifiName,
+  };
+}
+
+/**
+ * Enforces the location's on-site rule for a check-in or check-out: returns
+ * the evidence to keep with the record, or null where there is no rule. A
+ * refusal is audited, so HR can see who tried from where.
+ */
+async function verifyOnsiteAttempt(
+  auth: AuthContext,
+  context: EmployeeWorkContext,
+  action: 'Check-in' | 'Check-out',
+  input: OnsiteEvidence,
+  fingerprint: Fingerprint,
+): Promise<OnsiteVerification | null> {
+  const policy = await onsitePolicyFor(context.employeeId);
+  if (!policy) return null;
+
+  const result = verifyOnsite(policy, input, fingerprint.ipAddress);
+  if (result.ok) return result.verification;
+
+  await recordAudit({
+    action: 'REJECT',
+    entityType: 'AttendanceRecord',
+    legalEntityId: context.legalEntityId,
+    summary: `${action} refused for ${context.fullName}: ${result.message}`,
+    after: { reason: result.reason, location: policy.locationName, distanceMeters: result.distanceMeters ?? null },
+    actor: auth,
+    ...fingerprint,
+  });
+  throw new ForbiddenError(result.message, { reason: result.reason });
+}
+
+const asJson = (verification: OnsiteVerification) => verification as unknown as Prisma.InputJsonObject;
+
+// ---------------------------------------------------------------------------
 // Self-service: check in, check out, today
 // ---------------------------------------------------------------------------
 
@@ -109,8 +185,9 @@ function dayFromRecord(context: EmployeeWorkContext, plan: DayPlan, record: Atte
  */
 export async function checkIn(
   auth: AuthContext,
-  input: { notes?: string; source: 'WEB' | 'MOBILE' },
+  input: ClockInput,
   now: Date = new Date(),
+  fingerprint: Fingerprint = NO_FINGERPRINT,
 ): Promise<Record<string, unknown>> {
   const employeeId = requireSelf(auth);
   const context = await loadWorkContext(employeeId);
@@ -144,6 +221,7 @@ export async function checkIn(
   if (existing) {
     throw new ConflictError('HR has already recorded attendance for today. Please contact HR.');
   }
+  const verification = await verifyOnsiteAttempt(auth, context, 'Check-in', input, fingerprint);
 
   const evaluation = evaluateDay(plan, { checkIn: now, checkOut: null, statusOverride: null }, attendancePolicy(context.settings), {
     overtimeEligible: context.overtimeEligible,
@@ -159,6 +237,7 @@ export async function checkIn(
       timezone: plan.timezone,
       checkIn: now,
       checkInSource: input.source,
+      ...(verification ? { checkInVerification: asJson(verification) } : {}),
       source: input.source,
       notes: input.notes ?? null,
       ...metricsData(plan, evaluation),
@@ -174,8 +253,9 @@ export async function checkIn(
  */
 export async function checkOut(
   auth: AuthContext,
-  input: { notes?: string; source: 'WEB' | 'MOBILE' },
+  input: ClockInput,
   now: Date = new Date(),
+  fingerprint: Fingerprint = NO_FINGERPRINT,
 ): Promise<Record<string, unknown>> {
   const employeeId = requireSelf(auth);
   const context = await loadWorkContext(employeeId);
@@ -194,6 +274,7 @@ export async function checkOut(
     );
   }
   await assertPayrollPeriodOpen(prisma, open.legalEntityId, workDateKey);
+  const verification = await verifyOnsiteAttempt(auth, context, 'Check-out', input, fingerprint);
 
   const plan = snapshotPlan(await planForDate(context, workDateKey, open.timezone), open);
   const evaluation = evaluateDay(
@@ -209,6 +290,7 @@ export async function checkOut(
       data: {
         checkOut: now,
         checkOutSource: input.source,
+        ...(verification ? { checkOutVerification: asJson(verification) } : {}),
         notes: input.notes ?? open.notes,
         ...metricsData(plan, evaluation),
         // The plan snapshot taken at check-in stays authoritative.
@@ -249,6 +331,18 @@ export async function getMyToday(auth: AuthContext, now: Date = new Date()): Pro
   // one is not held against anyone - "not tracked yet", not "not tracked for you".
   const start = context.settings.attendanceStartDate ? toDateKey(context.settings.attendanceStartDate) : null;
   const trackingStartsOn = context.attendanceTracked && start && todayKey < start ? start : null;
+  // Where check-in needs the office QR code, the card says so instead of
+  // offering a button; the code itself never leaves the server.
+  const policy = await onsitePolicyFor(employeeId);
+  const onSite = policy
+    ? {
+        required: true,
+        locationName: policy.locationName,
+        needsLocation: policy.latitude !== null && policy.longitude !== null,
+        needsNetwork: policy.allowedNetworks.length > 0,
+        wifiName: policy.wifiName,
+      }
+    : null;
 
   return {
     serverTime: now,
@@ -259,6 +353,7 @@ export async function getMyToday(auth: AuthContext, now: Date = new Date()): Pro
     today: today ? serializeDay(today, { includeCorrection: true }) : null,
     openFromEarlierDay: open ? { id: open.id, date: toDateKey(open.workDate), checkInLocal: zonedClock(open.checkIn, open.timezone) } : null,
     trackingStartsOn,
+    onSite,
     canCheckIn: !record && !onLeave && !canCheckOut,
     canCheckOut,
   };

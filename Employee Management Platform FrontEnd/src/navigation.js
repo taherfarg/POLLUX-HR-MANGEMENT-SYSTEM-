@@ -15,6 +15,7 @@ import {
   Layers,
   MapPin,
   Palmtree,
+  QrCode,
   ReceiptText,
   Scale,
   Settings,
@@ -65,6 +66,7 @@ export const PAGES = {
   'my-documents': { title: 'My documents', description: 'Your contracts, certificates and payslips.', icon: FileText },
   'my-profile': { title: 'My profile', description: 'Your personal and employment details.', icon: UserRound },
   'my-team': { title: 'My team', description: 'Your direct reports, their attendance and requests.', icon: Layers },
+  'check-in': { title: 'Check in', description: 'Check in or out with the office QR code.', icon: QrCode },
 }
 
 const item = (id, label) => ({ id, label: label ?? PAGES[id].title, icon: PAGES[id].icon })
@@ -109,9 +111,17 @@ export function defaultPage(session) {
   return session.isManagement ? 'dashboard' : 'home'
 }
 
+/**
+ * Pages reached from outside the navigation: the office QR code opens
+ * #/check-in/<code> for anyone who checks in.
+ */
+const HIDDEN_PAGES = ['check-in']
+
 /** Pages a session may open. Anything else falls back to its home page. */
 export function allowedPages(session) {
-  return new Set(navigationFor(session).flatMap((group) => group.items.map((entry) => entry.id)))
+  const pages = new Set(navigationFor(session).flatMap((group) => group.items.map((entry) => entry.id)))
+  if (session.employee) for (const page of HIDDEN_PAGES) pages.add(page)
+  return pages
 }
 
 /** Where a page sits in this session's navigation: { group, label } for the breadcrumb. */
