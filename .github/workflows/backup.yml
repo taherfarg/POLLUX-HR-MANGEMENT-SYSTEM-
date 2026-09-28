@@ -1,0 +1,49 @@
+name: Daily database backup
+
+# Every night the database is dumped, encrypted with BACKUP_PASSPHRASE and
+# uploaded with rclone - to Google Drive by default, or anywhere rclone can
+# reach. Setup and restore: DEPLOYMENT.md, "Daily backups".
+on:
+  schedule:
+    - cron: '37 22 * * *' # 02:37 in Dubai
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump, encrypt, upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install rclone
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rclone >/dev/null
+
+      - name: Write the rclone config
+        env:
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          if [ -z "$RCLONE_CONFIG_CONTENT" ]; then
+            echo "::error::The RCLONE_CONFIG secret is not set - see DEPLOYMENT.md, Daily backups"
+            exit 1
+          fi
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+
+      - name: Back up
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          BACKUP_REMOTE: ${{ vars.BACKUP_REMOTE || 'gdrive:Pollux HR backups' }}
+          KEEP_DAYS: ${{ vars.BACKUP_KEEP_DAYS || '30' }}
+        run: bash .github/scripts/backup-database.sh

@@ -156,7 +156,7 @@ No new framework was introduced: Pollux HR was built by extending the
 | [docs/PERMISSIONS.md](docs/PERMISSIONS.md) | Who can see and do what, and where each rule is enforced |
 | [docs/POLLUX-HR-MIGRATION-PLAN.md](docs/POLLUX-HR-MIGRATION-PLAN.md) | The audit and plan written before the first change |
 | [Backend README](Employee%20Management%20Platform%20BackEnd/README.md) · [Frontend README](Employee%20Management%20Platform%20FrontEnd/README.md) | Running, environment, API reference |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Render + Neon |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Render + Neon; QR check-in setup; daily encrypted backups to Google Drive |
 
 ## Known limitations
 

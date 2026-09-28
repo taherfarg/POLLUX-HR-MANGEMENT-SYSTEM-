@@ -241,6 +241,68 @@ the … Wi-Fi* until HR adds the new one.
 
 ---
 
+## 7. Daily backups (15 min, once)
+
+Neon can roll the database back a short way (how far depends on the plan), but that lives
+in the same account as the data. `.github/workflows/backup.yml` keeps a copy somewhere
+else: every night at 02:37 Dubai time GitHub dumps the whole database, encrypts it with a
+password only you hold, and uploads it to Google Drive; backups older than 30 days are
+deleted. The database is all there is to back up - documents are stored as links, and
+letters, payslips and the logo come from the database.
+
+### 7a. Let it into your Google Drive (on your computer, once)
+
+1. Download rclone for Windows from [rclone.org/downloads](https://rclone.org/downloads/) and unzip it.
+2. In PowerShell, in that folder, run `.\rclone.exe config` and answer:
+   `n` (new remote) → name `gdrive` → storage `drive` (Google Drive) → leave
+   *client_id* and *client_secret* empty → scope **`drive.file`**, so it sees only the
+   files it creates, never the rest of your Drive → leave *service_account_file* empty →
+   `n` to advanced config → `y` to sign in with the browser: choose the Google account
+   that should hold the backups and allow → `n` to shared drive → `y` to keep it → `q`.
+3. `.\rclone.exe config file` prints where it saved this. Open that file in Notepad and
+   copy all of it.
+
+### 7b. Three secrets on GitHub
+
+Repository → **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Name | Value |
+|---|---|
+| `BACKUP_DATABASE_URL` | The Neon connection string - the same as Render's `DATABASE_URL` |
+| `BACKUP_PASSPHRASE` | A long password of your own. **Keep it in a password manager: without it no backup can be opened, by anyone, including you** |
+| `RCLONE_CONFIG` | Everything you copied from the rclone file |
+
+### 7c. Run it once now
+
+**Actions → Daily database backup → Run workflow.** A minute or two later your Drive has
+a folder *Pollux HR backups* with `pollux-hr-<date>-<time>.dump.gpg` in it. From then on
+it runs every night by itself, and GitHub emails you if one fails.
+
+rclone also reaches OneDrive, Dropbox, S3, Cloudflare R2, Backblaze B2 and more: create
+that remote in step 7a instead, then add a repository **variable** (same page, Variables
+tab) `BACKUP_REMOTE`, such as `onedrive:Pollux HR backups`. `BACKUP_KEEP_DAYS` changes the
+30 days.
+
+### Restoring
+
+Restore into a **new, empty** database - a new Neon branch or database, never the live
+one - check it, then point Render's `DATABASE_URL` at it. You need `gpg` and a PostgreSQL
+client of the database's version or newer (on Windows: Gpg4win, and the command-line
+tools from the PostgreSQL installer):
+
+```bash
+gpg --output pollux-hr.dump --decrypt pollux-hr-2026-09-28-2237.dump.gpg   # asks for BACKUP_PASSPHRASE
+pg_restore --no-owner --no-privileges --dbname "<the new database's connection string>" pollux-hr.dump
+```
+
+- The repository is public, so the workflow's log is too. It shows the file's name and
+  size and nothing else; the file is encrypted (AES-256) before it leaves GitHub's machine.
+- In a public repository GitHub pauses scheduled workflows after 60 days without a
+  commit. It emails a warning first; **Actions → Daily database backup → Enable
+  workflow** starts it again.
+
+---
+
 ## The free-tier caveat, stated plainly
 
 **Render free web services sleep after 15 minutes of inactivity.** The first request after that takes **roughly 50 seconds** while the container cold-starts — the login page will appear to hang.
