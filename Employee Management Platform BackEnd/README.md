@@ -263,7 +263,7 @@ HR_ADMIN.
 | POST | `/requests/leave/preview` | Chargeable days from the employee's schedule and calendar |
 | POST | `/requests/leave` · `/requests/document` · `/requests/profile-change` | HR may pass `employeeId` to file for someone in scope; for leave, the notice period then does not apply, so an absence that has already started can be recorded |
 | GET | `/requests/:id` | |
-| POST | `/requests/:id/approve` · `/reject` · `/cancel` | HR or the direct manager decide (never the requester); reject needs a reason |
+| POST | `/requests/:id/approve` · `/reject` · `/cancel` | HR or the direct manager decide (never the requester); reject needs a reason. `/cancel` withdraws a pending request (the requester or HR), or cancels approved leave (HR only, never your own, reason required): the days go back to the balance, refused while a payroll month it touches is approved or paid |
 </details>
 
 <details>
@@ -362,14 +362,14 @@ tracked from the day after setup. Walkthrough: [DEPLOYMENT.md, step 4a](../DEPLO
 TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?schema=public npm test
 ```
 
-**307 tests across 16 files**, against a real PostgreSQL test database:
+**311 tests across 16 files**, against a real PostgreSQL test database:
 
 | File | Covers |
 |---|---|
 | `access-control.test.ts` | The privacy matrix — would catch a serializer regression or a dropped check |
 | `auth.test.ts` | Login, refresh rotation and replay detection, lockout, password change, deactivation |
 | `employees.test.ts` | Creation, update with timeline and audit, status changes, search, compensation |
-| `request-workflows.test.ts` | Leave, document and profile workflows; balance hold/deduct/release |
+| `request-workflows.test.ts` | Leave, document and profile workflows; balance hold/deduct/release; HR cancelling approved leave |
 | `letters.test.ts` | Letter templates, salary guard, AI fallback |
 | `organisation.test.ts` | Company settings, work locations, schedules, calendars, employee-aware leave arithmetic |
 | `attendance-engine.test.ts` · `timezone.test.ts` | Every attendance rule; DST-safe local time |

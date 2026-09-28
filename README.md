@@ -26,7 +26,7 @@ each judged against their own schedule, timezone and holiday calendar.
 |---|---|
 | **People** | Employee file with tabs — Overview, Personal, Employment, Attendance, Leave, Salary, Advances, Payroll, Documents, Timeline — shown only to those allowed to see them. Departments, work locations (Dubai Office, Field, Remote) |
 | **Time** | One-tap check-in/out on the web or a phone — or, at an office that requires it, by scanning its QR code on site (position within a radius, office network), with the evidence kept; Present / Late / Partial / Absent / Missing check-out computed on the server in each person's own timezone; today board, timesheets, calendar; reusable work schedules; overtime from attendance with approval; HR corrections with a mandatory reason |
-| **Leave** | Requests with a live preview of the working days they cost; HR can record leave on someone's behalf, including leave that has already started, and approve it in one step; balances shown as *entitlement + carried − used − pending = available*; UAE holiday calendar by default, other calendars assigned per person |
+| **Leave** | Requests with a live preview of the working days they cost; HR can record leave on someone's behalf, including leave that has already started, and approve it in one step, and cancel approved leave that was recorded wrongly (with a reason; the days go back to the balance); balances shown as *entitlement + carried − used − pending = available*; UAE holiday calendar by default, other calendars assigned per person |
 | **Payroll** | Monthly runs `Draft → Calculated → Reviewed → Approved → Paid` with four-eyes approval, month locking and admin-only reopen; salary advances repaid in instalments; bonuses and deductions; PDF payslips stored at approval |
 | **Reports** | Attendance, late arrivals, absence, overtime, leave, leave balance, payroll, salary advances, employees — preview on screen, export as CSV, Excel or PDF, every export audited |
 | **Administration** | Users & roles, audit logs with before/after, company settings — every policy number lives in the database, not in code |
@@ -134,9 +134,9 @@ preinstalled Chromium.
 
 | Suite | Result |
 |---|---|
-| Backend integration — Vitest + Supertest against PostgreSQL | **307 / 307** |
+| Backend integration — Vitest + Supertest against PostgreSQL | **311 / 311** |
 | Frontend unit — client, adapters, formatting, navigation, audit diff, demo logins, on-site helpers | **60 / 60** |
-| E2E — Playwright, real stack, 1440×900 and 390×844 | **25 / 25** |
+| E2E — Playwright, real stack, 1440×900 and 390×844 | **26 / 26** |
 | Typecheck · backend build · frontend build · migrations from empty + seed | clean |
 
 ## Stack

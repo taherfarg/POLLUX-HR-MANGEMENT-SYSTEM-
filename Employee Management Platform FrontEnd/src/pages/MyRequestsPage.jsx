@@ -58,7 +58,7 @@ export default function MyRequestsPage({ onToast }) {
               { value: 'PENDING', label: 'Pending', count: summary.PENDING },
               { value: 'APPROVED', label: 'Approved' },
               { value: 'REJECTED', label: 'Rejected' },
-              { value: 'CANCELLED', label: 'Withdrawn' },
+              { value: 'CANCELLED', label: 'Cancelled' },
             ]}
           />
         </div>

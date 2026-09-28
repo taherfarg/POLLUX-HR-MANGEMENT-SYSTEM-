@@ -23,6 +23,7 @@ import { MonthCalendar } from './attendance.jsx'
 import { BalanceCards } from './leave.jsx'
 import EmployeeForm from './EmployeeForm.jsx'
 import LetterModal from './LetterModal.jsx'
+import RequestDetail from './RequestDetail.jsx'
 import RequestFormModal, { RecordLeaveModal } from './RequestFormModal.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { downloadFile, openFile } from '../lib/download.js'
@@ -323,6 +324,7 @@ function LeaveTab({ employee, self, canRecord, session, onToast }) {
     [employee.id, self],
   )
   const [recording, setRecording] = useState(false)
+  const [openId, setOpenId] = useState(null)
   return (
     <div className="page">
       <Async loading={balances.loading} error={balances.error} onRetry={balances.reload} rows={2}>
@@ -360,9 +362,20 @@ function LeaveTab({ employee, self, canRecord, session, onToast }) {
               { key: 'status', label: 'Status', render: (row) => <StatusPill status={row.statusValue} label={row.status} /> },
             ]}
             rows={requests.data?.items ?? []}
+            onRowClick={(row) => setOpenId(row.id)}
             empty={<EmptyMini icon={FileText} title="No leave requests" text="Requests appear here once submitted." />}
           />
         </Async>
+        <RequestDetail
+          requestId={openId}
+          mode={self ? 'own' : 'decide'}
+          onClose={() => setOpenId(null)}
+          onChanged={() => {
+            balances.reload()
+            requests.reload()
+          }}
+          onToast={onToast}
+        />
       </div>
     </div>
   )

@@ -42,7 +42,7 @@ HR admin. Every "HR" cell below means *HR within their scope*.
 | Today board / timesheets | ✖ | direct reports | everyone | everyone |
 | Overtime minutes | own | direct reports (approve/reject) | ✔ | ✔ |
 | Overtime **amounts** | own | **✖** | ✔ | ✔ |
-| Leave requests | own (submit, withdraw) | reports (approve/reject) | ✔ | ✔ |
+| Leave requests | own (submit, withdraw while pending) | reports (approve/reject) | ✔, and cancel approved leave (reason required; never their own) | same |
 | Leave balances | own | own + reports | read, generate year, adjust (reason required) | same |
 | Holidays, calendars, schedules, locations, departments | read | read | manage | manage |
 | A location's on-site check-in rule — QR code, office position, office networks | ✖ (only that a QR code is needed) | ✖ (same) | manage | manage |

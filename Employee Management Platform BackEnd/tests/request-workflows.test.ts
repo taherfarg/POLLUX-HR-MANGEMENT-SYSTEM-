@@ -259,6 +259,105 @@ describe('request workflows', () => {
     });
   });
 
+  describe('cancelling approved leave', () => {
+    /** Leave for the colleague, recorded and approved by HR. */
+    const recordApproved = async (startDate: string, endDate: string) => {
+      const recorded = await asUser(adminToken).post('/api/v1/requests/leave').send({
+        employeeId: fixture.colleague, leaveTypeId: fixture.annualAe, startDate, endDate, reason: 'Recorded by HR',
+      });
+      expect(recorded.status).toBe(201);
+      const approved = await asUser(adminToken).post(`/api/v1/requests/${recorded.body.data.id}/approve`).send({});
+      expect(approved.status).toBe(200);
+      return recorded.body.data.id as string;
+    };
+
+    it('lets HR cancel it with a reason: the days go back and the employee is told', async () => {
+      const before = await annualBalance(fixture.colleague);
+      const id = await recordApproved('2026-10-19', '2026-10-21'); // Monday to Wednesday
+      expect((await annualBalance(fixture.colleague)).used).toBe(before.used + 3);
+
+      const noReason = await asUser(adminToken).post(`/api/v1/requests/${id}/cancel`).send({});
+      expect(noReason.status).toBe(422);
+
+      const cancelled = await asUser(adminToken)
+        .post(`/api/v1/requests/${id}/cancel`)
+        .send({ note: 'Wrong dates, recorded again' });
+      expect(cancelled.status).toBe(200);
+      expect(cancelled.body.data.status).toBe('CANCELLED');
+      expect(cancelled.body.data.decisionNote).toBe('Wrong dates, recorded again');
+
+      const after = await annualBalance(fixture.colleague);
+      expect(after.used).toBe(before.used);
+      expect(after.pending).toBe(before.pending);
+
+      const audit = await prisma.auditLog.findFirstOrThrow({ where: { entityId: id, action: 'CANCEL' } });
+      expect(audit.summary).toContain('3 days returned');
+      const notice = await prisma.notification.findFirstOrThrow({ where: { entityId: id, type: 'REQUEST_CANCELLED' } });
+      expect(notice.body).toBe('Wrong dates, recorded again');
+
+      // Cancelled once: the days cannot be handed back twice.
+      const again = await asUser(adminToken).post(`/api/v1/requests/${id}/cancel`).send({ note: 'Again' });
+      expect(again.status).toBe(409);
+
+      // The same dates are free to be recorded correctly.
+      const redo = await asUser(adminToken).post('/api/v1/requests/leave').send({
+        employeeId: fixture.colleague, leaveTypeId: fixture.annualAe, startDate: '2026-10-19', endDate: '2026-10-21', reason: 'Recorded again',
+      });
+      expect(redo.status).toBe(201);
+      await asUser(adminToken).post(`/api/v1/requests/${redo.body.data.id}/cancel`).send({});
+    });
+
+    it('is not for the person on leave, their manager, or HR of another entity', async () => {
+      const submitted = await asUser(employeeToken).post('/api/v1/requests/leave').send({
+        leaveTypeId: fixture.annualAe, startDate: '2026-10-26', endDate: '2026-10-27', reason: 'Short trip',
+      });
+      const id = submitted.body.data.id as string;
+      expect((await asUser(managerToken).post(`/api/v1/requests/${id}/approve`).send({})).status).toBe(200);
+
+      const own = await asUser(employeeToken).post(`/api/v1/requests/${id}/cancel`).send({ note: 'Changed my mind' });
+      expect(own.status).toBe(403);
+      expect(own.body.error.message).toContain('ask HR');
+
+      const manager = await asUser(managerToken).post(`/api/v1/requests/${id}/cancel`).send({ note: 'Not needed' });
+      expect(manager.status).toBe(403);
+
+      const hrKsa = await asUser(await login(fixture.emails.hrKsa)).post(`/api/v1/requests/${id}/cancel`).send({ note: 'Not mine' });
+      expect(hrKsa.status).toBe(403);
+
+      expect((await asUser(adminToken).post(`/api/v1/requests/${id}/cancel`).send({ note: 'Trip called off' })).status).toBe(200);
+    });
+
+    it('is refused while a payroll month the leave falls in is approved', async () => {
+      const id = await recordApproved('2026-10-28', '2026-10-29');
+      const period = await prisma.payrollPeriod.create({
+        data: {
+          legalEntityId: fixture.entityAe, year: 2026, month: 10, name: 'October 2026',
+          startDate: new Date('2026-10-01'), endDate: new Date('2026-10-31'), currency: 'AED', status: 'APPROVED',
+        },
+      });
+      try {
+        const locked = await asUser(adminToken).post(`/api/v1/requests/${id}/cancel`).send({ note: 'Wrong dates' });
+        expect(locked.status).toBe(409);
+        expect(locked.body.error.message).toContain('October 2026');
+        expect((await prisma.request.findUniqueOrThrow({ where: { id } })).status).toBe('APPROVED');
+      } finally {
+        await prisma.payrollPeriod.delete({ where: { id: period.id } });
+      }
+      expect((await asUser(adminToken).post(`/api/v1/requests/${id}/cancel`).send({ note: 'Wrong dates' })).status).toBe(200);
+    });
+
+    it('leaves every other decided request as it is', async () => {
+      const submitted = await asUser(employeeToken).post('/api/v1/requests/leave').send({
+        leaveTypeId: fixture.annualAe, startDate: '2026-11-30', endDate: '2026-12-01', reason: 'Errand',
+      });
+      await asUser(adminToken).post(`/api/v1/requests/${submitted.body.data.id}/reject`).send({ note: 'Busy week' });
+
+      const response = await asUser(adminToken).post(`/api/v1/requests/${submitted.body.data.id}/cancel`).send({ note: 'Tidy up' });
+      expect(response.status).toBe(409);
+      expect(response.body.error.message).toContain('rejected');
+    });
+  });
+
   describe('approval rules', () => {
     let pendingRequestId: string;
 

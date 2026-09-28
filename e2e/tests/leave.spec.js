@@ -157,4 +157,50 @@ test.describe('Leave requests', () => {
     expect(annualAfter.pendingDays).toBe(annualBefore.pendingDays)
     health.assertClean()
   })
+
+  test('HR cancels leave that was approved by mistake, from the employee file, and the days go back', async ({ page }) => {
+    const health = trackPageHealth(page)
+    await signIn(page, ACCOUNTS.hr)
+    const rashid = (await apiAs(page, '/employees?q=Rashid')).body.data[0]
+    // Recorded with the wrong dates and approved at once.
+    const { startDate, endDate, year } = leaveWindow(1)
+    const annual = async () =>
+      (await apiAs(page, `/employees/${rashid.id}/leave-balances?year=${year}`)).body.data.find((row) => row.leaveType.code === 'ANNUAL')
+    const before = await annual()
+
+    const recorded = await apiAs(page, '/requests/leave', {
+      method: 'POST',
+      body: { employeeId: rashid.id, leaveTypeId: before.leaveType.id, startDate, endDate, reason: 'Recorded by HR' },
+    })
+    expect(recorded.status).toBe(201)
+    const { reference } = recorded.body.data
+    const days = recorded.body.data.leave.workingDays
+    expect((await apiAs(page, `/requests/${recorded.body.data.id}/approve`, { method: 'POST', body: {} })).status).toBe(200)
+    expect((await annual()).usedDays).toBe(before.usedDays + days)
+
+    // His file, Leave tab: the request opens from its row.
+    await gotoPage(page, 'Employees')
+    await page.getByRole('textbox', { name: /Search/ }).fill('Rashid')
+    await page.locator('tr', { hasText: rashid.fullName }).click()
+    await page.getByRole('tablist', { name: 'Profile sections' }).getByRole('tab', { name: /^Leave/ }).click()
+    const startLabel = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(`${startDate}T12:00:00`))
+    await page.locator('tr', { hasText: `${startLabel} –` }).click()
+    const dialog = page.getByRole('dialog').filter({ hasText: reference })
+    await expect(dialog).toContainText('Approved')
+
+    await dialog.getByRole('button', { name: 'Cancel leave' }).click()
+    await dialog.getByRole('button', { name: 'Cancel leave' }).click()
+    await expect(dialog).toContainText('Add a short reason')
+    await dialog.getByRole('textbox', { name: /Reason/ }).fill('Recorded with the wrong dates')
+    await dialog.getByRole('button', { name: 'Cancel leave' }).click()
+    await expect(page.locator('.toast')).toContainText(new RegExp(`${reference} cancelled\\. ${days} days? returned to the balance`))
+    await expect(dialog).toContainText('Cancelled')
+    await expect(dialog).toContainText('Recorded with the wrong dates')
+    await expect(dialog.getByRole('button', { name: 'Cancel leave' })).toHaveCount(0)
+
+    const after = await annual()
+    expect(after.usedDays).toBe(before.usedDays)
+    expect(after.pendingDays).toBe(before.pendingDays)
+    health.assertClean()
+  })
 })

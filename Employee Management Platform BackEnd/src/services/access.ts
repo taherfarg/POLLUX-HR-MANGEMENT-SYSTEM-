@@ -191,6 +191,24 @@ export function assertCanCancelRequest(
   }
 }
 
+/**
+ * Cancelling leave that was already approved, to put a wrong record right: HR
+ * within scope only, and never the person on leave - as with a decision,
+ * someone else has to do it.
+ */
+export function assertCanCancelApprovedLeave(
+  auth: AuthContext,
+  request: { employeeId: string; legalEntityId: string },
+): void {
+  const subject: EmployeeAccessSubject = { id: request.employeeId, legalEntityId: request.legalEntityId, managerId: null };
+  if (isSelf(auth, subject)) {
+    throw new ForbiddenError('You cannot cancel your own approved leave; ask HR');
+  }
+  if (!managesEmployee(auth, subject)) {
+    throw new ForbiddenError('Only HR can cancel leave that has been approved');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Pollux HR: administration
 // ---------------------------------------------------------------------------

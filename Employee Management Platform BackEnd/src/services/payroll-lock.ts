@@ -46,3 +46,27 @@ export async function assertPayrollPeriodOpen(client: TxClient, legalEntityId: s
     );
   }
 }
+
+/** The same, for a span of calendar days: refused if any of them is locked. */
+export async function assertPayrollRangeOpen(
+  client: TxClient,
+  legalEntityId: string,
+  startKey: string,
+  endKey: string,
+): Promise<void> {
+  const locked = await client.payrollPeriod.findFirst({
+    where: {
+      legalEntityId,
+      status: { in: LOCKED_PAYROLL_STATUSES },
+      startDate: { lte: new Date(`${endKey}T00:00:00.000Z`) },
+      endDate: { gte: new Date(`${startKey}T00:00:00.000Z`) },
+    },
+    orderBy: { startDate: 'asc' },
+    select: { name: true, status: true },
+  });
+  if (locked) {
+    throw new ConflictError(
+      `Payroll for ${locked.name} is ${locked.status.toLowerCase()}, so these dates are locked. An administrator must reopen that payroll first.`,
+    );
+  }
+}

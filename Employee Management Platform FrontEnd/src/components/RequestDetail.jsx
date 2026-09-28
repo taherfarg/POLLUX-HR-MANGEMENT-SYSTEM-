@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, CalendarDays, Check, CheckCircle2, Clock3, FileText, Globe2, Plane, UserRound, X } from 'lucide-react'
+import { ArrowRight, Ban, CalendarDays, Check, CheckCircle2, Clock3, FileText, Globe2, Plane, UserRound, X } from 'lucide-react'
 import { Avatar, ErrorState, FormError, LoadingState, Modal, RequestFact, Spinner, StatusPill } from './ui.jsx'
 import LetterModal from './LetterModal.jsx'
+import { useAuth } from '../hooks/useAuth.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { formatDate, plural } from '../lib/format.js'
 import { approveRequest, cancelRequest, fetchRequest, rejectRequest } from '../api/endpoints.js'
@@ -12,10 +13,12 @@ import { approveRequest, cancelRequest, fetchRequest, rejectRequest } from '../a
  * their own request, or someone else's team, is refused there.
  */
 export default function RequestDetail({ requestId, onClose, onChanged, onToast, mode = 'decide' }) {
+  const { session } = useAuth()
   const [letterId, setLetterId] = useState(null)
   const [note, setNote] = useState('')
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   const detail = useResource(() => fetchRequest(requestId), [requestId], { enabled: Boolean(requestId) })
   const request = detail.data
@@ -23,11 +26,20 @@ export default function RequestDetail({ requestId, onClose, onChanged, onToast, 
   useEffect(() => {
     setNote('')
     setError(null)
+    setCancelling(false)
   }, [request?.id])
 
   if (!requestId) return null
 
   const isPending = request?.statusValue === 'PENDING'
+  // Approved leave recorded wrongly is put right by HR: cancelled, then
+  // recorded again. Never by the person on leave.
+  const canCancelApproved =
+    mode === 'decide' &&
+    Boolean(session?.isManagement) &&
+    request?.typeValue === 'LEAVE' &&
+    request?.statusValue === 'APPROVED' &&
+    request?.employeeId !== session?.employee?.id
 
   const act = async (action) => {
     setBusy(true)
@@ -44,6 +56,15 @@ export default function RequestDetail({ requestId, onClose, onChanged, onToast, 
         }
         await rejectRequest(request.id, note.trim())
         onToast(`${request.reference} rejected.`)
+      } else if (action === 'cancel-approved') {
+        if (note.trim().length < 3) {
+          setError('Add a short reason - the employee sees it.')
+          setBusy(false)
+          return
+        }
+        await cancelRequest(request.id, note.trim())
+        setCancelling(false)
+        onToast(`${request.reference} cancelled. ${plural(request.days, 'day')} returned to the balance.`)
       } else {
         await cancelRequest(request.id, note)
         onToast(`${request.reference} withdrawn.`)
@@ -145,7 +166,7 @@ export default function RequestDetail({ requestId, onClose, onChanged, onToast, 
 
           {request.adminNote && !isPending && (
             <div className="reason-box">
-              <p className="eyebrow">Decision note</p>
+              <p className="eyebrow">{request.statusValue === 'CANCELLED' ? 'Reason for cancelling' : 'Decision note'}</p>
               <blockquote>{request.adminNote}</blockquote>
             </div>
           )}
@@ -153,6 +174,11 @@ export default function RequestDetail({ requestId, onClose, onChanged, onToast, 
             <p className="decision-meta">
               <CheckCircle2 size={15} /> Decided {formatDate(request.decidedAt)}
               {request.decidedBy ? ` by ${request.decidedBy}` : ''}
+            </p>
+          )}
+          {request.cancelledAt && (
+            <p className="decision-meta">
+              <Ban size={15} /> Cancelled {formatDate(request.cancelledAt)}
             </p>
           )}
 
@@ -165,7 +191,7 @@ export default function RequestDetail({ requestId, onClose, onChanged, onToast, 
             </div>
           )}
 
-          <FormError error={error} />
+          {!cancelling && <FormError error={error} />}
 
           {isPending && mode === 'decide' && (
             <div className="request-actions">
@@ -182,6 +208,44 @@ export default function RequestDetail({ requestId, onClose, onChanged, onToast, 
               <button className="button button-danger" onClick={() => act('cancel')} disabled={busy}>
                 {busy ? <Spinner size={15} /> : <X size={16} />} Withdraw request
               </button>
+            </div>
+          )}
+          {canCancelApproved && !cancelling && (
+            <div className="request-actions">
+              <button className="button button-ghost" onClick={() => setCancelling(true)}>
+                <Ban size={16} /> Cancel leave
+              </button>
+            </div>
+          )}
+          {canCancelApproved && cancelling && (
+            <div className="decision-box">
+              <p className="muted">
+                The {plural(request.days, 'day')} go back to {request.employee?.fullName}&apos;s balance. If the leave was
+                recorded wrongly, record the right one afterwards with Record leave.
+              </p>
+              <label className="field">
+                <span>
+                  Reason <small>Shared with the employee; required</small>
+                </span>
+                <textarea rows="3" value={note} onChange={(event) => setNote(event.target.value)} disabled={busy} />
+              </label>
+              <FormError error={error} />
+              <div className="request-actions">
+                <button
+                  className="button button-ghost"
+                  onClick={() => {
+                    setCancelling(false)
+                    setNote('')
+                    setError(null)
+                  }}
+                  disabled={busy}
+                >
+                  Keep leave
+                </button>
+                <button className="button button-danger" onClick={() => act('cancel-approved')} disabled={busy}>
+                  {busy ? <Spinner size={15} /> : <Ban size={16} />} Cancel leave
+                </button>
+              </div>
             </div>
           )}
         </div>

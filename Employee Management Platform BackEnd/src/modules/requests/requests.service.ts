@@ -6,6 +6,7 @@ import { toUtcDate } from '../../common/validate';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../common/errors';
 import type { AuthContext } from '../../common/auth-context';
 import {
+  assertCanCancelApprovedLeave,
   assertCanCancelRequest,
   assertCanDecideRequest,
   canViewRequest,
@@ -15,6 +16,7 @@ import {
 } from '../../services/access';
 import { recordAudit, type AuditInput } from '../../services/audit.service';
 import { notifyApprovers, notifyEmployee } from '../../services/notification.service';
+import { assertPayrollRangeOpen } from '../../services/payroll-lock';
 import { assertNoOverlappingLeave, calculateLeaveDays } from '../leave/leave.service';
 import { generateLetter, type GeneratedLetter, type LetterFacts } from '../ai/letter.service';
 import type {
@@ -1038,8 +1040,10 @@ export async function rejectRequest(
 }
 
 /**
- * Withdrawal by the employee. Only their own request, and only while it is
- * still pending - once a decision is recorded the history is fixed.
+ * Withdrawal by the employee, or cancellation by HR, while the request is
+ * still pending. Once decided the history is fixed, with one exception:
+ * approved leave that turns out to be wrong can be cancelled by HR (see
+ * cancelApprovedLeave).
  */
 export async function cancelRequest(
   auth: AuthContext,
@@ -1054,6 +1058,9 @@ export async function cancelRequest(
   // entity's requests.
   assertCanCancelRequest(auth, request);
 
+  if (request.status === 'APPROVED' && request.leaveDetail) {
+    return cancelApprovedLeave(auth, request, request.leaveDetail, note, fingerprint);
+  }
   if (request.status !== 'PENDING') {
     throw new ConflictError(`Only pending requests can be withdrawn; this one is ${request.status.toLowerCase()}`);
   }
@@ -1105,6 +1112,81 @@ export async function cancelRequest(
       entityId: requestId,
     });
   }
+
+  return serializeRequest(updated, true);
+}
+
+/**
+ * Cancels leave that was approved by mistake - wrong dates, wrong type - so
+ * HR can record it again correctly. HR only, never the person on leave, and
+ * with a reason the employee is sent. The days go back to the balance they
+ * were charged to. Refused when a payroll month the leave falls in is
+ * approved or paid: that payroll has already counted these days.
+ */
+async function cancelApprovedLeave(
+  auth: AuthContext,
+  request: RequestRow,
+  leave: NonNullable<RequestRow['leaveDetail']>,
+  note: string | undefined,
+  fingerprint: Fingerprint,
+): Promise<Record<string, unknown>> {
+  assertCanCancelApprovedLeave(auth, request);
+  if (!note || note.length < 3) {
+    throw new ValidationError('Validation failed', { note: ['Give the reason - the employee sees it'] });
+  }
+  await assertPayrollRangeOpen(
+    prisma,
+    request.legalEntityId,
+    leave.startDate.toISOString().slice(0, 10),
+    leave.endDate.toISOString().slice(0, 10),
+  );
+
+  const days = new Prisma.Decimal(leave.workingDays);
+  const updated = await prisma.$transaction(async (tx) => {
+    // Guarded on the status, so two people cancelling at once cannot hand the
+    // days back twice.
+    const cancelled = await tx.request.updateMany({
+      where: { id: request.id, status: 'APPROVED' },
+      data: { status: 'CANCELLED', cancelledAt: new Date(), decisionNote: note },
+    });
+    if (cancelled.count !== 1) {
+      throw new ConflictError('This leave has already been cancelled');
+    }
+    // Approval moved the days from reserved to spent; they are no longer spent.
+    await tx.leaveBalance.updateMany({
+      where: {
+        employeeId: request.employeeId,
+        leaveTypeId: leave.leaveTypeId,
+        year: leave.startDate.getUTCFullYear(),
+      },
+      data: { usedDays: { decrement: days } },
+    });
+
+    await recordAudit(
+      {
+        action: 'CANCEL',
+        entityType: 'Request',
+        entityId: request.id,
+        legalEntityId: request.legalEntityId,
+        summary: `Cancelled approved ${request.type} request ${request.reference}; ${days.toString()} days returned to the balance`,
+        before: { status: 'APPROVED', decisionNote: request.decisionNote },
+        after: { status: 'CANCELLED', note },
+        actor: auth,
+        ...fingerprint,
+      },
+      tx,
+    );
+
+    return tx.request.findUniqueOrThrow({ where: { id: request.id }, include: requestInclude });
+  });
+
+  await notifyEmployee(request.employeeId, {
+    type: 'REQUEST_CANCELLED',
+    title: `Leave ${request.reference} was cancelled`,
+    body: note,
+    entityType: 'Request',
+    entityId: request.id,
+  });
 
   return serializeRequest(updated, true);
 }
