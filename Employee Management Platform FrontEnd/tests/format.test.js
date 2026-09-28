@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAmount, formatDate, formatDays, formatMinutes, formatMonth, monthBounds, plural, shiftMonthKey } from '../src/lib/format.js'
+import { formatAmount, formatDate, formatDays, formatMinutes, formatMonth, greeting, monthBounds, plural, shiftMonthKey } from '../src/lib/format.js'
 
 describe('money formatting', () => {
   it('shows server-rounded amounts with two decimals and the record currency', () => {
@@ -61,5 +61,18 @@ describe('durations and counts', () => {
     expect(formatDays(0.5)).toBe('0.5 days')
     expect(plural(1, 'entity', 'entities')).toBe('1 entity')
     expect(plural(3, 'payslip')).toBe('3 payslips')
+  })
+})
+
+describe('greeting', () => {
+  const at = (hour, minute = 0) => new Date(2026, 8, 28, hour, minute)
+
+  it('says good morning until noon, good afternoon until six, then good evening', () => {
+    expect(greeting(at(0))).toBe('Good morning')
+    expect(greeting(at(11, 59))).toBe('Good morning')
+    expect(greeting(at(12))).toBe('Good afternoon')
+    expect(greeting(at(17, 59))).toBe('Good afternoon')
+    expect(greeting(at(18))).toBe('Good evening')
+    expect(greeting(at(23, 59))).toBe('Good evening')
   })
 })

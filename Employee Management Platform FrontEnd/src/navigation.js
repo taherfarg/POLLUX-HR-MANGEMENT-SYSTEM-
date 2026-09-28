@@ -124,6 +124,20 @@ export function allowedPages(session) {
   return pages
 }
 
+/**
+ * The phone's tab bar: the pages each role opens most, one tap away. Everything
+ * else stays in the full navigation behind "More".
+ */
+export function quickNavFor(session) {
+  const picks = session.isManagement
+    ? [['dashboard'], ['employees'], ['requests'], ['attendance']]
+    : session.isManager
+      ? [['home'], ['my-team', 'Team'], ['requests', 'Approvals'], ['my-requests', 'Requests']]
+      : [['home'], ['my-attendance', 'Attendance'], ['my-requests', 'Requests'], ['my-pay', 'Pay']]
+  const allowed = allowedPages(session)
+  return picks.filter(([id]) => allowed.has(id)).map(([id, label]) => item(id, label))
+}
+
 /** Where a page sits in this session's navigation: { group, label } for the breadcrumb. */
 export function locatePage(session, page) {
   for (const group of navigationFor(session)) {

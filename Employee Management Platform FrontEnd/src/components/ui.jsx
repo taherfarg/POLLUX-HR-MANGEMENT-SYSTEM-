@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, LockKeyhole, RotateCcw, Search, X, XCircle } from 'lucide-react'
-import { formatAmount } from '../lib/format.js'
+import { formatAmount, formatDate, greeting } from '../lib/format.js'
 
 /** Shared presentational primitives used across every page. */
 
@@ -21,7 +21,7 @@ export function Avatar({ employee, size = 'md' }) {
   // Rows can reference a person the caller may not load in full, so render a
   // neutral placeholder instead of crashing.
   if (!employee) {
-    return <span className={`avatar avatar-${size}`} style={{ background: '#e2e8f0' }} aria-hidden="true">—</span>
+    return <span className={`avatar avatar-${size}`} style={{ background: 'var(--surface-3)', color: 'var(--muted)' }} aria-hidden="true">—</span>
   }
   return (
     <span className={`avatar avatar-${size}`} style={{ background: employee.color }} aria-hidden="true">
@@ -215,6 +215,21 @@ export function PageHeader({ title, description, actions }) {
       <div>
         <h2>{title}</h2>
         {description && <p>{description}</p>}
+      </div>
+      {actions && <div className="button-row">{actions}</div>}
+    </header>
+  )
+}
+
+/** The greeting that opens the dashboard and the home page. */
+export function PageHero({ name, children, actions }) {
+  const now = new Date()
+  return (
+    <header className="page-hero">
+      <div>
+        <p className="eyebrow">{formatDate(now, { weekday: 'long', year: undefined })}</p>
+        <h2>{`${greeting(now)}, ${name || 'there'}`}</h2>
+        {children && <p>{children}</p>}
       </div>
       {actions && <div className="button-row">{actions}</div>}
     </header>

@@ -13,7 +13,7 @@ import {
   UsersRound,
   Wallet,
 } from 'lucide-react'
-import { Async, EmptyMini, Money, Panel, StatCard, StatusPill } from '../components/ui.jsx'
+import { Async, EmptyMini, Money, PageHero, Panel, StatCard, StatusPill } from '../components/ui.jsx'
 import { AttendanceStatus } from '../components/attendance.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { useChangeListener } from '../lib/events.js'
@@ -24,14 +24,17 @@ import { fetchDashboard } from '../api/endpoints.js'
  * The HR and administrator dashboard: today first, then what is waiting for a
  * decision, then payroll. Useful numbers, not decorative charts.
  */
-export default function DashboardPage({ navigate }) {
+export default function DashboardPage({ session, navigate }) {
   const dashboard = useResource(() => fetchDashboard(), [])
   useChangeListener('attendance', dashboard.reload)
 
   return (
-    <Async loading={dashboard.loading} error={dashboard.error} onRetry={dashboard.reload} rows={8}>
-      {dashboard.data && <Dashboard data={dashboard.data} navigate={navigate} />}
-    </Async>
+    <div className="page">
+      <PageHero name={session.employee?.firstName}>Today at Pollux Motors, and what needs your attention.</PageHero>
+      <Async loading={dashboard.loading} error={dashboard.error} onRetry={dashboard.reload} rows={8}>
+        {dashboard.data && <Dashboard data={dashboard.data} navigate={navigate} />}
+      </Async>
+    </div>
   )
 }
 

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell, CheckCircle2, ChevronRight, KeyRound, LogOut, Menu, X } from 'lucide-react'
+import { Bell, CheckCircle2, ChevronRight, KeyRound, LogOut, Menu, Monitor, Moon, MoreHorizontal, Search, Sun, X } from 'lucide-react'
 import { Avatar, BrandMark, FormError, FormField, LoadingState, Modal, Spinner, Toast } from './components/ui.jsx'
 import { ClockButton } from './components/attendance.jsx'
+import CommandPalette from './components/CommandPalette.jsx'
 import { useAuth } from './hooks/useAuth.jsx'
 import { CompanyProvider, useCompany } from './hooks/useCompany.jsx'
 import { useResource } from './hooks/useResource.js'
 import { useRoute } from './hooks/useRoute.js'
+import { useTheme } from './hooks/useTheme.jsx'
 import { formatDate } from './lib/format.js'
-import { allowedPages, defaultPage, locatePage, navigationFor } from './navigation.js'
+import { allowedPages, defaultPage, locatePage, navigationFor, quickNavFor } from './navigation.js'
 import {
   changePassword,
   fetchNotifications,
@@ -104,6 +106,7 @@ function Workspace({ session }) {
   const [toast, setToast] = useState(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const [securityOpen, setSecurityOpen] = useState(Boolean(session.mustChangePassword))
 
   const allowed = useMemo(() => allowedPages(session), [session])
@@ -116,6 +119,18 @@ function Workspace({ session }) {
   useEffect(() => {
     setSecurityOpen(Boolean(session.mustChangePassword))
   }, [session.userId, session.mustChangePassword])
+
+  // Ctrl+K (Cmd+K on a Mac) opens search from anywhere - except over a dialog.
+  useEffect(() => {
+    const onKey = (event) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') return
+      if (document.querySelector('.modal')) return
+      event.preventDefault()
+      setPaletteOpen((open) => !open)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const notifications = useResource(() => fetchNotifications(), [])
   const canDecide = session.isManagement || session.isManager
@@ -184,25 +199,23 @@ function Workspace({ session }) {
           <button className="mobile-menu" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
             <Menu size={20} />
           </button>
-          {page === 'dashboard' || page === 'home' ? (
-            <div className="topbar-title">
-              <h1>{`${greeting()}, ${session.employee?.firstName ?? 'there'}`}</h1>
-              <p>{formatDate(new Date(), { weekday: 'long' })}</p>
-            </div>
-          ) : (
-            // Pages carry their own heading and description; the sticky bar
-            // keeps the reader oriented once that heading has scrolled away.
-            <nav className="topbar-title breadcrumb" aria-label="Breadcrumb">
-              {crumb.group && (
-                <>
-                  <span>{crumb.group}</span>
-                  <ChevronRight size={14} aria-hidden="true" />
-                </>
-              )}
-              <h1>{crumb.label}</h1>
-            </nav>
-          )}
+          {/* Pages carry their own heading and description; the sticky bar
+              keeps the reader oriented once that heading has scrolled away. */}
+          <nav className="topbar-title breadcrumb" aria-label="Breadcrumb">
+            {crumb.group && (
+              <>
+                <span>{crumb.group}</span>
+                <ChevronRight size={14} aria-hidden="true" />
+              </>
+            )}
+            <h1>{crumb.label}</h1>
+          </nav>
           <div className="topbar-actions">
+            <button className="search-trigger" onClick={() => setPaletteOpen(true)} aria-label="Search" aria-keyshortcuts="Control+K Meta+K" title="Search">
+              <Search size={16} aria-hidden="true" />
+              <span>Search…</span>
+              <kbd className="kbd">{IS_MAC ? '⌘' : 'Ctrl'} K</kbd>
+            </button>
             {session.employee && <ClockButton onToast={showToast} />}
             <button
               className="notification-button"
@@ -239,6 +252,8 @@ function Workspace({ session }) {
         </main>
       </div>
 
+      <BottomNav session={session} page={page} onNavigate={navigate} onMore={() => setMobileNavOpen(true)} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} session={session} onNavigate={navigate} />
       <Toast toast={toast} onClose={() => setToast(null)} />
       <ChangePasswordModal
         open={securityOpen}
@@ -328,6 +343,7 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
 
         <div className="sidebar-fill" />
 
+        <ThemeSwitch />
         <div className="sidebar-user">
           <Avatar employee={user} size="sm" />
           <span>
@@ -343,6 +359,53 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
         </div>
       </aside>
     </>
+  )
+}
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
+
+const APPEARANCES = [
+  { value: 'system', label: 'Match the device', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+]
+
+/** Light, dark, or the device's own setting - kept per browser. */
+function ThemeSwitch() {
+  const { preference, setPreference } = useTheme()
+  return (
+    <div className="theme-switch">
+      <span id="appearance-label">Appearance</span>
+      <div role="group" aria-labelledby="appearance-label">
+        {APPEARANCES.map(({ value, label, icon: Icon }) => (
+          <button key={value} type="button" aria-label={label} title={label} aria-pressed={preference === value} onClick={() => setPreference(value)}>
+            <Icon size={15} />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** On phones: the role's most used pages as a tab bar, the rest behind "More". */
+function BottomNav({ session, page, onNavigate, onMore }) {
+  const items = quickNavFor(session)
+  return (
+    <nav className="bottom-nav" aria-label="Quick navigation" style={{ '--items': items.length + 1 }}>
+      {items.map((entry) => {
+        const Icon = entry.icon
+        return (
+          <button key={entry.id} type="button" onClick={() => onNavigate(entry.id)} aria-current={page === entry.id ? 'page' : undefined}>
+            <Icon size={21} aria-hidden="true" />
+            <span>{entry.label}</span>
+          </button>
+        )
+      })}
+      <button type="button" onClick={onMore} aria-label="More pages">
+        <MoreHorizontal size={21} aria-hidden="true" />
+        <span>More</span>
+      </button>
+    </nav>
   )
 }
 
@@ -478,11 +541,4 @@ function ChangePasswordModal({ open, forced, onClose, onComplete }) {
 
 export function formatRole(role) {
   return { ADMIN: 'Administrator', HR_ADMIN: 'HR admin', MANAGER: 'Manager', EMPLOYEE: 'Employee' }[role] ?? role
-}
-
-function greeting() {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
 }

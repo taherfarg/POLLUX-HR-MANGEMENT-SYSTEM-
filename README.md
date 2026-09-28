@@ -30,6 +30,7 @@ each judged against their own schedule, timezone and holiday calendar.
 | **Payroll** | Monthly runs `Draft → Calculated → Reviewed → Approved → Paid` with four-eyes approval, month locking and admin-only reopen; salary advances repaid in instalments; bonuses and deductions; PDF payslips stored at approval |
 | **Reports** | Attendance, late arrivals, absence, overtime, leave, leave balance, payroll, salary advances, employees — preview on screen, export as CSV, Excel or PDF, every export audited |
 | **Administration** | Users & roles, audit logs with before/after, company settings — every policy number lives in the database, not in code |
+| **Experience** | Light and dark appearance (the device's, or chosen per browser); **Ctrl/⌘ K** search that opens any page and, for HR, any person; a tab bar on phones for the pages each role uses most; tables that become cards on small screens; the Inter typeface served with the app, no third-party font requests |
 
 <table>
 <tr>
@@ -47,6 +48,14 @@ each judged against their own schedule, timezone and holiday calendar.
 <tr>
 <td align="center"><em>Every line of a payslip, rounded once, adding up exactly</em></td>
 <td align="center"><em>Today's attendance, each person in their own timezone</em></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><img src="docs/screenshots/pollux-search.jpg" alt="Search dialog opened with Ctrl+K: matching pages such as Leave balances and Salary advances, and matching people with their job and department" width="100%"></td>
+<td width="50%" valign="top"><img src="docs/screenshots/pollux-dark.jpg" alt="The HR dashboard in the dark appearance" width="100%"></td>
+</tr>
+<tr>
+<td align="center"><em>Ctrl/⌘ K: any page, or any person</em></td>
+<td align="center"><em>The dark appearance</em></td>
 </tr>
 </table>
 
@@ -135,8 +144,8 @@ preinstalled Chromium.
 | Suite | Result |
 |---|---|
 | Backend integration — Vitest + Supertest against PostgreSQL | **311 / 311** |
-| Frontend unit — client, adapters, formatting, navigation, audit diff, demo logins, on-site helpers | **60 / 60** |
-| E2E — Playwright, real stack, 1440×900 and 390×844 | **26 / 26** |
+| Frontend unit — client, adapters, formatting, navigation and the phone tab bar, audit diff, demo logins, on-site helpers, appearance | **66 / 66** |
+| E2E — Playwright, real stack, 1440×900 and 390×844 | **28 / 28** |
 | Typecheck · backend build · frontend build · migrations from empty + seed | clean |
 
 ## Stack

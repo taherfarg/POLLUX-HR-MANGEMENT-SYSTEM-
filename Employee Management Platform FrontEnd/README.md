@@ -53,20 +53,24 @@ and API only.
 
 ```text
 src/
-├── App.jsx            shell: role navigation, breadcrumb top bar, check-in button,
-│                      notifications, password change; maps routes to pages
+├── App.jsx            shell: role navigation, breadcrumb top bar, search, check-in button,
+│                      notifications, appearance switch, phone tab bar, password change;
+│                      maps routes to pages
 ├── navigation.js      every page, its group and which role sees it
 ├── hooks/             useAuth (session, refresh), useRoute (hash router: #/page/param),
 │                      useResource (loading/error/data, stale-safe), useCompany (company +
-│                      departments, locations, schedules, calendars)
+│                      departments, locations, schedules, calendars), useTheme (light, dark
+│                      or the device's appearance)
 ├── api/               client.js (tokens, single-flight refresh, ApiError with field
 │                      errors), endpoints.js (one function per API call), adapters.js
 ├── lib/               format.js (dates, money, durations), download.js (files behind
 │                      auth), events.js (tiny change bus between widgets)
-├── components/        ui.jsx (DataTable, Modal, Tabs, StatCard, ConfirmDialog, …) and
-│                      feature components (attendance, leave, payroll, advances, profile…)
+├── components/        ui.jsx (DataTable, Modal, Tabs, StatCard, PageHero, ConfirmDialog, …),
+│                      CommandPalette.jsx (Ctrl/⌘ K search) and feature components
+│                      (attendance, leave, payroll, advances, profile…)
 ├── pages/             one file per page
-└── styles.css         the Pollux design system (tokens, components, responsive rules)
+└── styles.css         the Pollux design system: tokens for the light and the dark theme,
+                       components, responsive rules
 ```
 
 - **Money is displayed, never calculated.** Amounts arrive rounded from the server and
@@ -76,14 +80,22 @@ src/
 - **Files behind authentication** (payslips, report exports, documents) are fetched with
   the bearer token and opened or saved as object URLs.
 - **Phones**: under 720 px every table becomes a list of cards, the sidebar becomes a
-  drawer, and dialogs become bottom sheets. Check-in is on the home screen.
+  drawer behind a tab bar of the role's most used pages, and dialogs become bottom sheets.
+  Check-in is on the home screen.
+- **Appearance**: light, dark, or the device's own setting, switched in the sidebar and
+  kept per browser. Every colour is a token in `styles.css`, redefined for the dark theme;
+  `index.html` applies the choice before the first paint.
+- **Search**: Ctrl+K (⌘K on a Mac) or the search box opens any page in the person's
+  navigation and, for HR, any employee by name, number or email.
+- **Fonts** (Inter, JetBrains Mono) are bundled from `@fontsource-variable`, so the app
+  makes no third-party font requests and the browser loads only the alphabets a page uses.
 - **Dialogs stack** (an approval over a detail view) with unique accessible names;
   Escape closes the top one.
 
 ## Tests
 
 ```bash
-npm test        # 60 unit tests: API client, adapters, formatting, role navigation, audit diff, demo logins, on-site check-in
+npm test        # 66 unit tests: API client, adapters, formatting, role navigation and tab bar, audit diff, demo logins, on-site check-in, appearance
 npm run build
 ```
 

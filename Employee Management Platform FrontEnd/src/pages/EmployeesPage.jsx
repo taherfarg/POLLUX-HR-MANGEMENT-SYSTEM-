@@ -144,15 +144,18 @@ function EmployeeList({ session, navigate, onToast }) {
               {
                 key: 'location',
                 label: 'Works from',
-                render: (row) => (
-                  <div className="button-row">
-                    {row.workLocationName && <Chip>{row.workLocationName}</Chip>}
+                render: (row) =>
+                  row.workLocationName ? (
+                    <>
+                      <Chip>{row.workLocationName}</Chip>
+                      <small>{row.workMode}</small>
+                    </>
+                  ) : (
                     <Chip>{row.workMode}</Chip>
-                  </div>
-                ),
+                  ),
               },
               { key: 'manager', label: 'Manager', render: (row) => row.managerName ?? '—' },
-              { key: 'joined', label: 'Joined', render: (row) => (row.joinDate ? formatDate(row.joinDate) : '—') },
+              { key: 'joined', label: 'Joined', className: 'nowrap', render: (row) => (row.joinDate ? formatDate(row.joinDate) : '—') },
               { key: 'status', label: 'Status', render: (row) => <StatusPill status={row.statusValue} label={row.status} /> },
             ]}
             rows={employees}

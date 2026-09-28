@@ -31,6 +31,14 @@ export const formatDate = (value, options = {}) => {
 /** "Mon, 14 Sep" for day lists. */
 export const formatDay = (value) => formatDate(value, { weekday: 'short', year: undefined })
 
+/** "Good morning" until noon, "Good afternoon" until six, then "Good evening". */
+export const greeting = (date = new Date()) => {
+  const hour = date.getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 export const formatTime = (value) => {
   if (!value) return ''
   const date = new Date(value)

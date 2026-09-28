@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedPages, defaultPage, locatePage, navigationFor } from '../src/navigation.js'
+import { allowedPages, defaultPage, locatePage, navigationFor, quickNavFor } from '../src/navigation.js'
 
 const employee = { id: 'e1', firstName: 'Ahmed' }
 const sessions = {
@@ -78,5 +78,26 @@ describe('navigation by role', () => {
     expect(locatePage(sessions.manager, 'requests')).toEqual({ group: 'My team', label: 'Approvals' })
     expect(locatePage(sessions.employee, 'my-pay')).toEqual({ group: 'Me', label: 'My pay' })
     expect(locatePage(sessions.hr, 'reports')).toEqual({ group: null, label: 'Reports' })
+  })
+})
+
+describe('the phone tab bar', () => {
+  const ids = (session) => quickNavFor(session).map((entry) => entry.id)
+  const labels = (session) => quickNavFor(session).map((entry) => entry.label)
+
+  it('gives each role its most used pages, all of them pages it may open', () => {
+    expect(ids(sessions.hr)).toEqual(['dashboard', 'employees', 'requests', 'attendance'])
+    expect(ids(sessions.manager)).toEqual(['home', 'my-team', 'requests', 'my-requests'])
+    expect(labels(sessions.manager)).toEqual(['Home', 'Team', 'Approvals', 'Requests'])
+    expect(ids(sessions.employee)).toEqual(['home', 'my-attendance', 'my-requests', 'my-pay'])
+    expect(labels(sessions.employee)).toEqual(['Home', 'Attendance', 'Requests', 'Pay'])
+    for (const session of Object.values(sessions)) {
+      const allowed = allowedPages(session)
+      for (const id of ids(session)) expect(allowed.has(id)).toBe(true)
+    }
+  })
+
+  it('leaves out the self-service pages for an administrator with no employee record', () => {
+    expect(ids({ ...sessions.admin, employee: null })).toEqual(['dashboard', 'employees', 'requests', 'attendance'])
   })
 })
