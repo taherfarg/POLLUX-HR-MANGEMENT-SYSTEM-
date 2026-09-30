@@ -6,15 +6,35 @@
 #   DATABASE_URL       the Neon connection string (the pooled one is fine - see below)
 #   BACKUP_PASSPHRASE  the password each backup is encrypted with. Keep it somewhere
 #                      safe: without it no backup can be opened.
-#   BACKUP_REMOTE      where the file goes, in rclone's terms ("gdrive:Pollux HR backups")
+#   BACKUP_REMOTE      optional: where the file goes, in rclone's terms ("gdrive:Pollux HR
+#                      backups"). Left empty, the rclone config's only remote is used,
+#                      with the folder BACKUP_FOLDER (default "Pollux HR backups").
 #   KEEP_DAYS          backups older than this are deleted there (default 30)
 # and an rclone config that defines the remote.
 set -euo pipefail
 
 : "${DATABASE_URL:?the BACKUP_DATABASE_URL secret is not set}"
 : "${BACKUP_PASSPHRASE:?the BACKUP_PASSPHRASE secret is not set}"
-: "${BACKUP_REMOTE:?no backup destination is set}"
+BACKUP_REMOTE="${BACKUP_REMOTE:-}"
+BACKUP_FOLDER="${BACKUP_FOLDER:-Pollux HR backups}"
 KEEP_DAYS="${KEEP_DAYS:-30}"
+
+# Where the file goes, settled before the dump. Remotes are checked by name
+# only - a name is no secret - so a wrong paste is plain from the log.
+remotes="$(rclone listremotes --ask-password=false 2>/dev/null | grep -vx 'DEFAULT:' || true)"
+listed="$(printf '%s' "$remotes" | tr '\n' ' ')"
+if [ -z "$BACKUP_REMOTE" ]; then
+  if [ "$(printf '%s\n' "$remotes" | grep -c .)" -ne 1 ]; then
+    echo "::error::The RCLONE_CONFIG secret should hold one remote (it has: ${listed:-none}). With several, set the BACKUP_REMOTE variable to the one to use - see DEPLOYMENT.md, Daily backups"
+    exit 1
+  fi
+  BACKUP_REMOTE="$remotes$BACKUP_FOLDER"
+fi
+if ! printf '%s\n' "$remotes" | grep -qxF "${BACKUP_REMOTE%%:*}:"; then
+  echo "::error::The RCLONE_CONFIG secret has no remote called \"${BACKUP_REMOTE%%:*}\" (it has: ${listed:-none}). Paste all of rclone.conf, starting with its [name] line - see DEPLOYMENT.md, Daily backups"
+  exit 1
+fi
+echo "Backups go to $BACKUP_REMOTE"
 
 # A dump needs a direct connection: Neon's pooler (the "-pooler" host) runs in
 # transaction mode, which pg_dump cannot use.

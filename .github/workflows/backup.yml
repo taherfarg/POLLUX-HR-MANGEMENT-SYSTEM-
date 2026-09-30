@@ -21,7 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      BACKUP_REMOTE: ${{ vars.BACKUP_REMOTE || 'gdrive:Pollux HR backups' }}
+      # Empty unless set: the rclone config's only remote is then used, with
+      # BACKUP_FOLDER. Set it ("name:folder") when the config holds several.
+      BACKUP_REMOTE: ${{ vars.BACKUP_REMOTE }}
+      BACKUP_FOLDER: Pollux HR backups
       KEEP_DAYS: ${{ vars.BACKUP_KEEP_DAYS || '30' }}
     steps:
       - uses: actions/checkout@v4
@@ -43,14 +46,6 @@ jobs:
           # A config copied on Windows arrives with CRLF line ends.
           printf '%s\n' "$RCLONE_CONFIG_CONTENT" | tr -d '\r' > ~/.config/rclone/rclone.conf
           chmod 600 ~/.config/rclone/rclone.conf
-          # Checked before the dump, by name only - a remote's name is no
-          # secret - so a wrong paste is plain from the log.
-          remote="${BACKUP_REMOTE%%:*}"
-          if ! rclone listremotes --ask-password=false | grep -qxF "$remote:"; then
-            found="$(rclone listremotes --ask-password=false 2>/dev/null | grep -vx 'DEFAULT:' | tr '\n' ' ')"
-            echo "::error::The RCLONE_CONFIG secret has no remote called \"$remote\" (it has: ${found:-none}). Paste all of rclone.conf, starting with its [$remote] line - see DEPLOYMENT.md, Daily backups"
-            exit 1
-          fi
 
       - name: Back up
         env:

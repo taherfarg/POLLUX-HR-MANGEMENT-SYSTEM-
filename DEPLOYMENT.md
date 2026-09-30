@@ -254,14 +254,14 @@ letters, payslips and the logo come from the database.
 
 1. Download rclone for Windows from [rclone.org/downloads](https://rclone.org/downloads/) and unzip it.
 2. In PowerShell, in that folder, run `.\rclone.exe config` and answer:
-   `n` (new remote) → name `gdrive` → storage `drive` (Google Drive) → leave
+   `n` (new remote) → a name, such as `gdrive` → storage `drive` (Google Drive) → leave
    *client_id* and *client_secret* empty → scope **`drive.file`**, so it sees only the
    files it creates, never the rest of your Drive → leave *service_account_file* empty →
    `n` to advanced config → `y` to sign in with the browser: choose the Google account
    that should hold the backups and allow → `n` to shared drive → `y` to keep it → `q`.
 3. Open what it saved in Notepad - `notepad (.\rclone.exe config file)[-1]` - and copy
-   all of it (Ctrl+A, Ctrl+C). It starts with the line `[gdrive]`, then `type = drive`
-   and a long `token = {...}` line. Copy the text, not the file's path.
+   all of it (Ctrl+A, Ctrl+C). It starts with the name in brackets, such as `[gdrive]`,
+   then `type = drive` and a long `token = {...}` line. Copy the text, not the file's path.
 
 ### 7b. Three secrets on GitHub
 
@@ -279,10 +279,11 @@ Repository → **Settings → Secrets and variables → Actions → New reposito
 a folder *Pollux HR backups* with `pollux-hr-<date>-<time>.dump.gpg` in it. From then on
 it runs every night by itself, and GitHub emails you if one fails.
 
-rclone also reaches OneDrive, Dropbox, S3, Cloudflare R2, Backblaze B2 and more: create
-that remote in step 7a instead, then add a repository **variable** (same page, Variables
-tab) `BACKUP_REMOTE`, such as `onedrive:Pollux HR backups`. `BACKUP_KEEP_DAYS` changes the
-30 days.
+The backup goes to the one remote in the rclone file, whatever its name. rclone also
+reaches OneDrive, Dropbox, S3, Cloudflare R2, Backblaze B2 and more: create that remote in
+step 7a instead. Only when the file holds several remotes, add a repository **variable**
+(same page, Variables tab) `BACKUP_REMOTE` naming one and a folder, such as
+`onedrive:Pollux HR backups`. `BACKUP_KEEP_DAYS` changes the 30 days.
 
 ### Restoring
 
