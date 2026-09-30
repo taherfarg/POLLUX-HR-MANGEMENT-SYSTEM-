@@ -259,8 +259,9 @@ letters, payslips and the logo come from the database.
    files it creates, never the rest of your Drive → leave *service_account_file* empty →
    `n` to advanced config → `y` to sign in with the browser: choose the Google account
    that should hold the backups and allow → `n` to shared drive → `y` to keep it → `q`.
-3. `.\rclone.exe config file` prints where it saved this. Open that file in Notepad and
-   copy all of it.
+3. Open what it saved in Notepad - `notepad (.\rclone.exe config file)[-1]` - and copy
+   all of it (Ctrl+A, Ctrl+C). It starts with the line `[gdrive]`, then `type = drive`
+   and a long `token = {...}` line. Copy the text, not the file's path.
 
 ### 7b. Three secrets on GitHub
 
