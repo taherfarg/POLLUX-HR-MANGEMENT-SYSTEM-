@@ -165,11 +165,17 @@ table { border-collapse: collapse; }
 
 /* --- Brand -------------------------------------------------------------- */
 
-.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -.015em; color: var(--ink); }
-.brand small { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); letter-spacing: -.003em; }
-.brand-mark { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(145deg, #16244a, var(--navy)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), var(--shadow-sm); flex: 0 0 auto; }
-.brand-mark svg { display: block; }
-.brand-mark-lg { width: 44px; height: 44px; border-radius: 12px; }
+/* The Pollux Motors logo: navy on light screens, its own silver on dark ones. */
+.brand-logo { display: block; height: 52px; width: auto; max-width: 100%; }
+.brand-logo-set { display: inline-flex; min-width: 0; }
+.brand-logo-set .logo-for-dark { display: none; }
+:root[data-theme='dark'] .brand-logo-set .logo-for-light { display: none; }
+:root[data-theme='dark'] .brand-logo-set .logo-for-dark { display: block; }
+.sidebar-brand { display: inline-flex; align-items: center; min-width: 0; }
+.product-tag { margin-left: 12px; padding: 3px 0 3px 12px; border-left: 1px solid var(--line-strong); font-size: 15px; font-weight: 650; letter-spacing: .08em; line-height: 1.4; color: var(--muted); }
+.brand-mark { display: block; width: 32px; height: 32px; border-radius: 8px; flex: 0 0 auto; }
+.brand-mark-lg { width: 44px; height: 44px; border-radius: 11px; }
+.boot-screen .brand-logo { height: 64px; }
 
 /* --- Buttons -------------------------------------------------------------- */
 
@@ -547,6 +553,9 @@ button.list-row:hover { background: var(--hover); }
 }
 .login-story::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(255, 255, 255, .08) 1px, transparent 1px); background-size: 22px 22px; mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent); }
 .login-story > * { position: relative; z-index: 1; }
+.login-story .brand-logo { height: 76px; }
+.login-story .product-tag { margin-left: 16px; padding-left: 16px; font-size: 19px; color: #c7d2e4; border-left-color: rgba(255, 255, 255, .22); }
+.mobile-brand .brand-logo { height: 52px; }
 .login-story h1 { font-size: clamp(36px, 4.4vw, 60px); line-height: 1.04; letter-spacing: -.035em; font-weight: 700; max-width: 660px; }
 .login-story h1 em { font-style: normal; color: var(--star); }
 .login-story p { max-width: 520px; margin-top: 18px; font-size: 16.5px; color: #b9c5da; line-height: 1.6; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell, CheckCircle2, ChevronRight, KeyRound, LogOut, Menu, Monitor, Moon, MoreHorizontal, Search, Sun, X } from 'lucide-react'
-import { Avatar, BrandMark, FormError, FormField, LoadingState, Modal, Spinner, Toast } from './components/ui.jsx'
+import { Avatar, BrandLogo, BrandMark, FormError, FormField, LoadingState, Modal, Spinner, Toast } from './components/ui.jsx'
 import { ClockButton } from './components/attendance.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import { useAuth } from './hooks/useAuth.jsx'
@@ -85,7 +85,7 @@ export default function App() {
   if (bootstrapping) {
     return (
       <div className="boot-screen">
-        <BrandMark size="lg" />
+        <BrandLogo className="boot-logo" />
         <LoadingState label="Restoring your session…" />
       </div>
     )
@@ -298,12 +298,9 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
       {open && <button className="nav-scrim" aria-label="Close navigation" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
         <div className="sidebar-head">
-          <span className="brand">
-            <BrandMark />
-            <span>
-              Pollux HR
-              <small>People &amp; payroll</small>
-            </span>
+          <span className="sidebar-brand">
+            <BrandLogo />
+            <span className="product-tag">HR</span>
           </span>
           <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">
             <X size={20} />
@@ -311,7 +308,7 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
         </div>
 
         <div className="company-chip">
-          {logo ? <img src={logo} alt="" /> : <span className="company-logo">P</span>}
+          {logo ? <img src={logo} alt="" /> : <BrandMark />}
           <span>
             <strong>{companyName}</strong>
             <small>{company?.company ? `${company.company.city}, ${company.company.countryName}` : 'Dubai, UAE'}</small>

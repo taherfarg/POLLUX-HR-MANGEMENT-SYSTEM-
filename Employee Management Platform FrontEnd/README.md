@@ -69,6 +69,8 @@ src/
 │                      CommandPalette.jsx (Ctrl/⌘ K search) and feature components
 │                      (attendance, leave, payroll, advances, profile…)
 ├── pages/             one file per page
+├── assets/brand/      the Pollux Motors logo - navy for light screens, its own silver for
+│                      dark ones - and the monogram (BrandLogo, BrandMark in ui.jsx)
 └── styles.css         the Pollux design system: tokens for the light and the dark theme,
                        components, responsive rules
 ```

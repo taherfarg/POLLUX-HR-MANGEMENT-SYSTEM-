@@ -1,18 +1,28 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, LockKeyhole, RotateCcw, Search, X, XCircle } from 'lucide-react'
 import { formatAmount, formatDate, greeting } from '../lib/format.js'
+import brandMarkUrl from '../assets/brand/pollux-motors-mark.png'
+import logoForLightUrl from '../assets/brand/pollux-motors-logo-dark.webp'
+import logoForDarkUrl from '../assets/brand/pollux-motors-logo-light.webp'
 
 /** Shared presentational primitives used across every page. */
 
-/** The Pollux mark: a four-point star - Pollux is the brightest star in Gemini. */
+/** The Pollux Motors monogram, white on night navy - also the browser tab icon. */
 export function BrandMark({ size = 'md' }) {
-  const pixels = size === 'lg' ? 26 : 19
+  return <img className={`brand-mark ${size === 'lg' ? 'brand-mark-lg' : ''}`} src={brandMarkUrl} alt="" aria-hidden="true" />
+}
+
+/**
+ * The Pollux Motors logo. Its own colours - silver on dark - read only on a
+ * dark ground, so light screens get the same logo in navy, the star unchanged.
+ * `onDark` keeps the silver one regardless of the theme, for navy panels.
+ */
+export function BrandLogo({ onDark = false, className = '' }) {
+  if (onDark) return <img className={`brand-logo ${className}`} src={logoForDarkUrl} alt="Pollux Motors" />
   return (
-    <span className={`brand-mark ${size === 'lg' ? 'brand-mark-lg' : ''}`} aria-hidden="true">
-      <svg width={pixels} height={pixels} viewBox="0 0 24 24">
-        <path d="M12 1.5c.5 5.2 2.3 8 10.5 10.5-8.2 2.5-10 5.3-10.5 10.5-.5-5.2-2.3-8-10.5-10.5C9.7 9.5 11.5 6.7 12 1.5Z" fill="#f5b301" />
-        <circle cx="12" cy="12" r="2.2" fill="#0b1324" />
-      </svg>
+    <span className={`brand-logo-set ${className}`}>
+      <img className="brand-logo logo-for-light" src={logoForLightUrl} alt="Pollux Motors" />
+      <img className="brand-logo logo-for-dark" src={logoForDarkUrl} alt="Pollux Motors" />
     </span>
   )
 }

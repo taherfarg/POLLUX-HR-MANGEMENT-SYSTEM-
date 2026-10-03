@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CalendarCheck2, Clock, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Wallet } from 'lucide-react'
-import { BrandMark, Spinner } from '../components/ui.jsx'
+import { BrandLogo, Spinner } from '../components/ui.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { fetchBranding } from '../api/endpoints.js'
 import { DEMO_ACCOUNTS, DEMO_PASSWORD, demoAccountsEnabled } from '../data.js'
@@ -51,12 +51,9 @@ export default function LoginScreen() {
   return (
     <main className="login-page">
       <section className="login-story" aria-label="About Pollux HR">
-        <span className="brand" style={{ color: 'white' }}>
-          <BrandMark size="lg" />
-          <span>
-            Pollux HR
-            <small>{company}</small>
-          </span>
+        <span className="sidebar-brand">
+          <BrandLogo onDark />
+          <span className="product-tag">HR</span>
         </span>
         <div>
           <h1>
@@ -80,9 +77,9 @@ export default function LoginScreen() {
 
       <section className="login-panel">
         <div className="login-form-wrap">
-          <span className="brand mobile-brand">
-            <BrandMark />
-            <span>Pollux HR</span>
+          <span className="sidebar-brand mobile-brand">
+            <BrandLogo />
+            <span className="product-tag">HR</span>
           </span>
           <div>
             <p className="eyebrow">{company}</p>
