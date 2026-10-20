@@ -74,7 +74,21 @@ describe('clean start (db:setup)', () => {
 
     beforeAll(async () => {
       await resetDatabase();
-      await createFixture(); // demo-style data, all on `.demo` addresses
+      const demo = await createFixture(); // demo-style data, all on `.demo` addresses
+      // A demo task and a demo conversation, which must not survive either.
+      const [admin, colleague] = await Promise.all([
+        prisma.user.findUniqueOrThrow({ where: { email: demo.emails.admin } }),
+        prisma.user.findUniqueOrThrow({ where: { email: demo.emails.colleague } }),
+      ]);
+      await prisma.task.create({ data: { title: 'Demo task', assigneeId: demo.employee, legalEntityId: demo.entityAe, createdById: admin.id } });
+      await prisma.conversation.create({
+        data: {
+          kind: 'DIRECT',
+          directKey: [admin.id, colleague.id].sort().join(':'),
+          members: { create: [{ userId: admin.id }, { userId: colleague.id }] },
+          messages: { create: [{ senderId: admin.id, body: 'Demo message' }] },
+        },
+      });
       accounts = parseSetupAccounts(ENV);
       await runSetup(prisma, accounts, { today: TODAY, allowWipe: false });
     });
@@ -95,6 +109,8 @@ describe('clean start (db:setup)', () => {
         prisma.compensationRecord.count(),
         prisma.salaryAdvance.count(),
       ]);
+      const [tasks, conversations, messages] = await Promise.all([prisma.task.count(), prisma.conversation.count(), prisma.chatMessage.count()]);
+      expect([tasks, conversations, messages]).toEqual([0, 0, 0]);
 
       expect(entities).toHaveLength(1);
       expect(entities[0]?.legalName).toBe('POLLUX MOTORS FZE');

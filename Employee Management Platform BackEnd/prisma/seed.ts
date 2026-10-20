@@ -46,6 +46,8 @@ import {
   reviewPeriod,
 } from '../src/modules/payroll/payroll.service';
 import { calculateLeaveDays } from '../src/modules/leave/leave.service';
+import { addTaskComment, createTask, updateTask } from '../src/modules/tasks/tasks.service';
+import { createConversation } from '../src/modules/chat/chat.service';
 import { loadWorkContexts, type EmployeeWorkContext } from '../src/services/work-context';
 import { addDaysToKey, zonedDateKey, zonedWallTimeToUtc } from '../src/services/timezone';
 
@@ -357,6 +359,11 @@ const EMPLOYEES: SeedEmployee[] = [
 
 async function reset(): Promise<void> {
   await prisma.$transaction([
+    prisma.chatMessage.deleteMany(),
+    prisma.conversationMember.deleteMany(),
+    prisma.conversation.deleteMany(),
+    prisma.taskComment.deleteMany(),
+    prisma.task.deleteMany(),
     prisma.overtimeEntry.deleteMany(),
     prisma.salaryAdvanceInstallment.deleteMany(),
     prisma.payrollAdjustment.deleteMany(),
@@ -1074,6 +1081,76 @@ async function main(): Promise<void> {
   console.log(
     `  Ahmed Nabil, ${periods[0]?.name}: gross ${ahmedRecord.grossEarnings.toFixed(2)}, deductions ${ahmedRecord.totalDeductions.toFixed(2)}, net ${ahmedRecord.netSalary.toFixed(2)}`,
   );
+
+  // --- Tasks ---------------------------------------------------------------------------
+  // What a sales manager and HR hand out in a normal week: one in progress with
+  // a comment, one due tomorrow, one late, and a personal to-do already done.
+  const task = async (by: AuthContext, input: Parameters<typeof createTask>[1]) => (await createTask(by, input, SEED)).id;
+  const report = await task(manager, {
+    title: 'Prepare the monthly showroom sales report',
+    description: 'Test drives, quotes and closed deals per model. Finance needs it before payroll closes.',
+    priority: 'HIGH', dueDate: addDaysToKey(TODAY, 3), assigneeId: id('PLX-0004'),
+  });
+  await updateTask(ahmed, report, { status: 'IN_PROGRESS' }, SEED);
+  await addTaskComment(ahmed, report, 'Draft is in the shared folder - adding the finance numbers today.');
+  await task(manager, {
+    title: 'Follow up with Demo Logistics LLC on the fleet quote',
+    description: 'They asked for a 12-vehicle quote with service plan. Confirm delivery dates.',
+    priority: 'URGENT', dueDate: addDaysToKey(TODAY, 1), assigneeId: id('PLX-0005'),
+  });
+  await task(manager, {
+    title: 'Complete the product training on the new SUV range',
+    priority: 'NORMAL', dueDate: addDaysToKey(TODAY, -2), assigneeId: id('PLX-0006'),
+  });
+  await task(hr, {
+    title: 'Upload a copy of your renewed Emirates ID',
+    description: 'Scan both sides. HR keeps it on file for the visa record.',
+    priority: 'NORMAL', dueDate: addDaysToKey(TODAY, 7), assigneeId: id('PLX-0004'),
+  });
+  await task(hr, { title: 'Sign the probation review form', priority: 'HIGH', dueDate: addDaysToKey(TODAY, 5), assigneeId: id('PLX-0006') });
+  await task(admin, { title: 'Review the year-end leave carry-over policy', priority: 'NORMAL', dueDate: addDaysToKey(TODAY, 14), assigneeId: id('PLX-0002') });
+  const service = await task(ahmed, { title: 'Book a service for the demo vehicle', priority: 'LOW' });
+  await updateTask(ahmed, service, { status: 'DONE' }, SEED);
+  console.log(`  ${await prisma.task.count()} tasks`);
+
+  // --- Chat ----------------------------------------------------------------------------
+  // Conversations with history: lines are written with their own times, so the
+  // demo reads like a real week rather than everything sent a second ago.
+  const at = (daysAgo: number, clock: string) => zonedWallTimeToUtc(addDaysToKey(TODAY, -daysAgo), hours(clock), COMPANY_TZ);
+  // Today's lines are a little before the seed runs, whatever the hour.
+  const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
+  const say = async (conversationId: string, from: AuthContext, body: string, when: Date, readBy: AuthContext[] = []) => {
+    await prisma.chatMessage.create({ data: { conversationId, senderId: from.userId, body, createdAt: when, updatedAt: when } });
+    await prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: when } });
+    await prisma.conversationMember.updateMany({
+      where: { conversationId, userId: { in: [from, ...readBy].map((reader) => reader.userId) } },
+      data: { lastReadAt: when },
+    });
+  };
+  const opened = async (by: AuthContext, input: Parameters<typeof createConversation>[1], since: Date) => {
+    const { conversation } = await createConversation(by, input, SEED);
+    // Back-date the opening so the first lines come after it.
+    await prisma.conversation.update({ where: { id: conversation.id }, data: { createdAt: since, lastMessageAt: since } });
+    await prisma.conversationMember.updateMany({ where: { conversationId: conversation.id }, data: { joinedAt: since, lastReadAt: null } });
+    await prisma.chatMessage.updateMany({ where: { conversationId: conversation.id }, data: { createdAt: since, updatedAt: since } });
+    return conversation.id;
+  };
+
+  const salesTeam = [ahmed, layla, auth.get('PLX-0012') as AuthContext].filter(Boolean);
+  const group = await opened(manager, { kind: 'GROUP', title: 'Sales team', userIds: salesTeam.map((member) => member.userId) }, at(3, '09:00'));
+  await say(group, layla, 'Strong weekend in the showroom - 14 test drives and 3 deposits.', at(3, '09:12'), [manager, ahmed, ...salesTeam]);
+  await say(group, manager, 'Well done, everyone. Weekly review on Monday at 9:30 in the meeting room.', at(3, '09:20'), [layla, ahmed, ...salesTeam]);
+  await say(group, layla, 'Can someone cover the showroom floor tomorrow between 1 and 2?', minutesAgo(35), [manager]);
+
+  const withAhmed = await opened(manager, { kind: 'DIRECT', userId: ahmed.userId }, at(1, '16:30'));
+  await say(withAhmed, manager, 'Ahmed, the fleet client is coming in tomorrow at 11. Can you prepare two test-drive slots?', at(1, '16:42'), [ahmed]);
+  await say(withAhmed, ahmed, "Sure - I'll book the sedan demo car and the SUV.", at(1, '16:50'), [manager]);
+  await say(withAhmed, manager, 'Great. Bring the updated price sheet too, please.', minutesAgo(50));
+
+  const fromHr = await opened(hr, { kind: 'DIRECT', userId: ahmed.userId }, at(2, '11:00'));
+  await say(fromHr, hr, 'Hi Ahmed, your salary certificate is ready - you can download it from My documents.', at(2, '11:05'), [ahmed]);
+  await say(fromHr, ahmed, 'Thank you, Sara!', at(2, '11:20'), [hr]);
+  console.log(`  ${await prisma.conversation.count()} conversations, ${await prisma.chatMessage.count()} messages`);
 
   console.log('\nDemo accounts (password from SEED_DEMO_PASSWORD):');
   for (const person of EMPLOYEES.filter((candidate) => candidate.login)) {

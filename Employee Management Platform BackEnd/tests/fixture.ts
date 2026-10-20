@@ -12,6 +12,12 @@ export const app: Express = createApp();
 /** Empties every table in dependency order. Called before each test file. */
 export async function resetDatabase(): Promise<void> {
   await prisma.$transaction([
+    // Tasks and chat point at employees and logins.
+    prisma.chatMessage.deleteMany(),
+    prisma.conversationMember.deleteMany(),
+    prisma.conversation.deleteMany(),
+    prisma.taskComment.deleteMany(),
+    prisma.task.deleteMany(),
     // Pollux pay and time records first: they point at employees and at each other.
     prisma.overtimeEntry.deleteMany(),
     prisma.salaryAdvanceInstallment.deleteMany(),

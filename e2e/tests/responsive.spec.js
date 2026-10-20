@@ -31,7 +31,7 @@ test.describe('Mobile layout', () => {
     await expect(page.getByRole('region', { name: "Today's attendance" })).toBeVisible()
     await expectNoHorizontalOverflow(page, 'employee home')
 
-    for (const label of ['My attendance', 'My requests', 'My pay', 'My documents', 'My profile']) {
+    for (const label of ['Tasks', 'Chat', 'My attendance', 'My requests', 'My pay', 'My documents', 'My profile']) {
       await gotoPage(page, label)
       await expectNoHorizontalOverflow(page, `employee ${label}`)
     }

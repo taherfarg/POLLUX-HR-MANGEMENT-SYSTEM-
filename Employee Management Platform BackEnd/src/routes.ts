@@ -3,6 +3,7 @@ import { advancesRouter } from './modules/advances/advances.routes';
 import { attendanceRouter } from './modules/attendance/attendance.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { auditRouter } from './modules/audit/audit.routes';
+import { chatRouter } from './modules/chat/chat.routes';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { departmentsRouter } from './modules/departments/departments.routes';
 import { documentsRouter } from './modules/documents/documents.routes';
@@ -17,6 +18,7 @@ import { payrollRouter, payslipsRouter } from './modules/payroll/payroll.routes'
 import { reportsRouter } from './modules/reports/reports.routes';
 import { requestsRouter } from './modules/requests/requests.routes';
 import { publicRouter, settingsRouter } from './modules/settings/settings.routes';
+import { tasksRouter } from './modules/tasks/tasks.routes';
 import { usersRouter } from './modules/users/users.routes';
 import { workLocationsRouter } from './modules/work-locations/work-locations.routes';
 import { workSchedulesRouter } from './modules/work-schedules/work-schedules.routes';
@@ -52,6 +54,8 @@ apiRouter.get('/', (_req, res) => {
         users: '/api/v1/users',
         dashboard: '/api/v1/dashboard',
         notifications: '/api/v1/notifications',
+        tasks: '/api/v1/tasks',
+        chat: '/api/v1/chat',
         settings: '/api/v1/settings',
         auditLogs: '/api/v1/audit-logs',
         legalEntities: '/api/v1/legal-entities',
@@ -81,5 +85,7 @@ apiRouter.use('/reports', reportsRouter);
 apiRouter.use('/users', usersRouter);
 apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/notifications', notificationsRouter);
+apiRouter.use('/tasks', tasksRouter);
+apiRouter.use('/chat', chatRouter);
 apiRouter.use('/settings', settingsRouter);
 apiRouter.use('/audit-logs', auditRouter);

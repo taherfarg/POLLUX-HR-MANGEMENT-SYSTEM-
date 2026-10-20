@@ -4,6 +4,7 @@ import { Async, EmptyMini, Money, PageHero, Panel, StatCard, StatusPill } from '
 import { AttendanceStatus, CheckInCard } from '../components/attendance.jsx'
 import { BalanceCards } from '../components/leave.jsx'
 import RequestFormModal from '../components/RequestFormModal.jsx'
+import { MyTasksPanel } from '../components/tasks.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { useChangeListener } from '../lib/events.js'
 import { openFile } from '../lib/download.js'
@@ -45,6 +46,7 @@ export default function HomePage({ session, navigate, onToast }) {
         </div>
 
         <div className="page">
+          {session.employee && <MyTasksPanel navigate={navigate} />}
           <Async loading={dashboard.loading} error={dashboard.error} onRetry={dashboard.reload} rows={4}>
             {data && (
               <>

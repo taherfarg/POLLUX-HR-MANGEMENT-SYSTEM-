@@ -5,13 +5,16 @@ import { ClockButton } from './components/attendance.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import { useAuth } from './hooks/useAuth.jsx'
 import { CompanyProvider, useCompany } from './hooks/useCompany.jsx'
+import { usePolling } from './hooks/usePolling.js'
 import { useResource } from './hooks/useResource.js'
 import { useRoute } from './hooks/useRoute.js'
 import { useTheme } from './hooks/useTheme.jsx'
+import { useChangeListener } from './lib/events.js'
 import { formatDate } from './lib/format.js'
 import { allowedPages, defaultPage, locatePage, navigationFor, quickNavFor } from './navigation.js'
 import {
   changePassword,
+  fetchChatUnread,
   fetchNotifications,
   fetchRequests,
   markAllNotificationsRead,
@@ -45,10 +48,14 @@ import MyPayPage from './pages/MyPayPage.jsx'
 import MyProfilePage from './pages/MyProfilePage.jsx'
 import MyTeamPage from './pages/MyTeamPage.jsx'
 import CheckInPage from './pages/CheckInPage.jsx'
+import TasksPage from './pages/TasksPage.jsx'
+import ChatPage from './pages/ChatPage.jsx'
 
 const PAGE_COMPONENTS = {
   dashboard: DashboardPage,
   home: HomePage,
+  tasks: TasksPage,
+  chat: ChatPage,
   employees: EmployeesPage,
   departments: DepartmentsPage,
   'work-locations': WorkLocationsPage,
@@ -133,6 +140,12 @@ function Workspace({ session }) {
   }, [])
 
   const notifications = useResource(() => fetchNotifications(), [])
+  // New messages and notifications reach a page left open without a reload.
+  const chatUnread = useResource(fetchChatUnread, [])
+  usePolling(chatUnread.reload, CHAT_BADGE_POLL_MS)
+  usePolling(notifications.reload, NOTIFICATION_POLL_MS)
+  useChangeListener('chat', chatUnread.reload)
+  const unreadMessages = chatUnread.data?.messages ?? 0
   const canDecide = session.isManagement || session.isManager
   const pending = useResource(
     () => (canDecide ? fetchRequests({ status: 'PENDING', pageSize: 1, myTeamOnly: !session.isManagement }) : Promise.resolve(null)),
@@ -170,7 +183,7 @@ function Workspace({ session }) {
       }
     }
     const target = notificationTarget(entry, session)
-    if (target && allowed.has(target)) navigate(target)
+    if (target && allowed.has(target)) navigate(target, entry.entityType === 'Task' ? entry.entityId : undefined)
     else setNotificationsOpen(false)
   }
 
@@ -192,6 +205,7 @@ function Workspace({ session }) {
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
         pendingCount={pending.data?.summary?.PENDING ?? 0}
+        unreadMessages={unreadMessages}
       />
 
       <div className="workspace">
@@ -252,7 +266,7 @@ function Workspace({ session }) {
         </main>
       </div>
 
-      <BottomNav session={session} page={page} onNavigate={navigate} onMore={() => setMobileNavOpen(true)} />
+      <BottomNav session={session} page={page} onNavigate={navigate} onMore={() => setMobileNavOpen(true)} unreadMessages={unreadMessages} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} session={session} onNavigate={navigate} />
       <Toast toast={toast} onClose={() => setToast(null)} />
       <ChangePasswordModal
@@ -282,12 +296,14 @@ function notificationTarget(entry, session) {
       return management || session.isManager ? 'overtime' : 'my-attendance'
     case 'Employee':
       return management ? 'employees' : 'my-profile'
+    case 'Task':
+      return 'tasks'
     default:
       return null
   }
 }
 
-function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClose, pendingCount }) {
+function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClose, pendingCount, unreadMessages }) {
   const { company, companyName } = useCompany()
   const groups = navigationFor(session)
   const user = session.employee
@@ -331,6 +347,7 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
                     <Icon size={18} />
                     <span>{entry.label}</span>
                     {entry.id === 'requests' && pendingCount > 0 && <b>{pendingCount}</b>}
+                    {entry.id === 'chat' && unreadMessages > 0 && <b>{badgeCount(unreadMessages)}</b>}
                   </button>
                 )
               })}
@@ -359,6 +376,11 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
   )
 }
 
+const CHAT_BADGE_POLL_MS = 30_000
+const NOTIFICATION_POLL_MS = 60_000
+
+const badgeCount = (count) => (count > 99 ? '99+' : count)
+
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
 
 const APPEARANCES = [
@@ -385,7 +407,7 @@ function ThemeSwitch() {
 }
 
 /** On phones: the role's most used pages as a tab bar, the rest behind "More". */
-function BottomNav({ session, page, onNavigate, onMore }) {
+function BottomNav({ session, page, onNavigate, onMore, unreadMessages }) {
   const items = quickNavFor(session)
   return (
     <nav className="bottom-nav" aria-label="Quick navigation" style={{ '--items': items.length + 1 }}>
@@ -395,6 +417,7 @@ function BottomNav({ session, page, onNavigate, onMore }) {
           <button key={entry.id} type="button" onClick={() => onNavigate(entry.id)} aria-current={page === entry.id ? 'page' : undefined}>
             <Icon size={21} aria-hidden="true" />
             <span>{entry.label}</span>
+            {entry.id === 'chat' && unreadMessages > 0 && <b className="bottom-nav-badge" aria-label={`${unreadMessages} unread`}>{badgeCount(unreadMessages)}</b>}
           </button>
         )
       })}

@@ -13,7 +13,9 @@ import {
   History,
   Home,
   Layers,
+  ListTodo,
   MapPin,
+  MessagesSquare,
   Palmtree,
   QrCode,
   ReceiptText,
@@ -34,6 +36,8 @@ import {
 export const PAGES = {
   dashboard: { title: 'Dashboard', description: 'Today at Pollux Motors, and what needs your attention.', icon: Gauge },
   home: { title: 'Home', description: 'Your day, your time off and your pay at a glance.', icon: Home },
+  tasks: { title: 'Tasks', description: 'Work given to you, by you and to your team.', icon: ListTodo },
+  chat: { title: 'Chat', description: 'Messages with colleagues, one to one or in groups.', icon: MessagesSquare },
 
   employees: { title: 'Employees', description: 'Everyone at Pollux Motors - office, field and remote.', icon: UsersRound },
   departments: { title: 'Departments', description: 'Teams and who leads them.', icon: Building2 },
@@ -79,7 +83,7 @@ export function navigationFor(session) {
 
   if (session.isManagement) {
     return [
-      { label: null, items: [item('dashboard')] },
+      { label: null, items: [item('dashboard'), item('tasks'), item('chat')] },
       { label: 'People', items: [item('employees'), item('departments'), item('work-locations')] },
       { label: 'Time', items: [item('attendance'), item('timesheets'), item('work-schedules'), item('overtime')] },
       { label: 'Leave', items: [item('requests'), item('leave-balances'), item('holidays')] },
@@ -92,7 +96,7 @@ export function navigationFor(session) {
 
   if (session.isManager) {
     return [
-      { label: null, items: [item('home')] },
+      { label: null, items: [item('home'), item('tasks'), item('chat')] },
       { label: 'Me', items: [...self.slice(0, 3), item('my-documents'), item('my-profile')] },
       {
         label: 'My team',
@@ -102,7 +106,7 @@ export function navigationFor(session) {
   }
 
   return [
-    { label: null, items: [item('home')] },
+    { label: null, items: [item('home'), item('tasks'), item('chat')] },
     { label: 'Me', items: [...self.slice(0, 3), item('my-documents'), item('my-profile')] },
   ]
 }
@@ -130,10 +134,10 @@ export function allowedPages(session) {
  */
 export function quickNavFor(session) {
   const picks = session.isManagement
-    ? [['dashboard'], ['employees'], ['requests'], ['attendance']]
+    ? [['dashboard'], ['employees'], ['requests'], ['chat']]
     : session.isManager
-      ? [['home'], ['my-team', 'Team'], ['requests', 'Approvals'], ['my-requests', 'Requests']]
-      : [['home'], ['my-attendance', 'Attendance'], ['my-requests', 'Requests'], ['my-pay', 'Pay']]
+      ? [['home'], ['requests', 'Approvals'], ['tasks'], ['chat']]
+      : [['home'], ['my-attendance', 'Attendance'], ['tasks'], ['chat']]
   const allowed = allowedPages(session)
   return picks.filter(([id]) => allowed.has(id)).map(([id, label]) => item(id, label))
 }

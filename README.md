@@ -28,6 +28,8 @@ each judged against their own schedule, timezone and holiday calendar.
 | **Time** | One-tap check-in/out on the web or a phone — or, at an office that requires it, by scanning its QR code on site (position within a radius, office network), with the evidence kept; Present / Late / Partial / Absent / Missing check-out computed on the server in each person's own timezone; today board, timesheets, calendar; reusable work schedules; overtime from attendance with approval; HR corrections with a mandatory reason |
 | **Leave** | Requests with a live preview of the working days they cost; HR can record leave on someone's behalf, including leave that has already started, and approve it in one step, and cancel approved leave that was recorded wrongly (with a reason; the days go back to the balance); balances shown as *entitlement + carried − used − pending = available*; UAE holiday calendar by default, other calendars assigned per person |
 | **Payroll** | Monthly runs `Draft → Calculated → Reviewed → Approved → Paid` with four-eyes approval, month locking and admin-only reopen; salary advances repaid in instalments; bonuses and deductions; PDF payslips stored at approval |
+| **Tasks** | Work given to a person by themselves, their manager or HR — priority, due date, *to do → in progress → done*, and a comment thread; lists for *assigned to me*, *assigned by me*, *my team* and (HR) *everyone*, with overdue counted in the office's timezone; the assignee moves a task along, only its creator or HR can rewrite, cancel or delete it; each step notifies the other side |
+| **Chat** | One-to-one and group conversations between colleagues: unread counts in the navigation and on the phone tab bar, day separators, unsending your own message, adding people to a group, renaming and leaving it; new messages arrive without a reload. A conversation is readable by its members only — HR and administrators included |
 | **Reports** | Attendance, late arrivals, absence, overtime, leave, leave balance, payroll, salary advances, employees — preview on screen, export as CSV, Excel or PDF, every export audited |
 | **Administration** | Users & roles, audit logs with before/after, company settings — every policy number lives in the database, not in code |
 | **Experience** | Light and dark appearance (the device's, or chosen per browser); **Ctrl/⌘ K** search that opens any page and, for HR, any person; a tab bar on phones for the pages each role uses most; tables that become cards on small screens; the Inter typeface served with the app, no third-party font requests |
@@ -85,6 +87,8 @@ each judged against their own schedule, timezone and holiday calendar.
   one file, [`services/access.ts`](Employee%20Management%20Platform%20BackEnd/src/services/access.ts),
   and proven by the E2E suite with each role's own token.
 - **Nobody approves their own request, overtime, advance or payroll.**
+- **Chats are private to their members.** There is no endpoint through which HR or an
+  administrator can list or read other people's conversations.
 - **Every sensitive action is audited** — corrections, approvals, payroll steps, exports,
   reading someone else's salary.
 
@@ -137,15 +141,16 @@ variables, so real emails and passwords never enter the repository. See
 
 The E2E suite migrates and seeds its own `pollux_e2e` database and starts both servers
 itself, so it never touches your demo data. It covers the employee attendance, leave
-request, salary advance, HR payroll and employee payslip flows, the permission
-boundaries, and phone layouts. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a
+request, salary advance, HR payroll and employee payslip flows, a task handed from a
+manager to an employee and a chat between two colleagues signed in at once, the
+permission boundaries, and phone layouts. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a
 preinstalled Chromium.
 
 | Suite | Result |
 |---|---|
-| Backend integration — Vitest + Supertest against PostgreSQL | **311 / 311** |
-| Frontend unit — client, adapters, formatting, navigation and the phone tab bar, audit diff, demo logins, on-site helpers, appearance | **66 / 66** |
-| E2E — Playwright, real stack, 1440×900 and 390×844 | **28 / 28** |
+| Backend integration — Vitest + Supertest against PostgreSQL | **335 / 335** |
+| Frontend unit — client, adapters, formatting, navigation and the phone tab bar, audit diff, demo logins, on-site helpers, appearance, task due dates, chat threads | **73 / 73** |
+| E2E — Playwright, real stack, 1440×900 and 390×844 | **30 / 30** |
 | Typecheck · backend build · frontend build · migrations from empty + seed | clean |
 
 ## Stack
@@ -173,7 +178,8 @@ Payslips and reports are generated as PDF/Excel/CSV, but other documents are sti
 metadata plus letter text (no general file upload yet) · on-site check-in trusts the
 browser's reported position, which developer tools can fake - the office network check is
 what cannot be faked from home, so use both · no WPS/SIF bank file export
-yet (payment is recorded with a reference) · end-of-service gratuity is not calculated ·
+yet (payment is recorded with a reference) · chat arrives by polling (every few seconds
+while a conversation is open), not push, and carries text only - no attachments · end-of-service gratuity is not calculated ·
 rate limiting is in-process · public holidays are illustrative, since Islamic dates move
 with lunar observation.
 

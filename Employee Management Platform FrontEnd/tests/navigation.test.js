@@ -52,7 +52,15 @@ describe('navigation by role', () => {
 
   it('gives an employee only their own pages', () => {
     const pages = [...allowedPages(sessions.employee)].sort()
-    expect(pages).toEqual(['check-in', 'home', 'my-attendance', 'my-documents', 'my-pay', 'my-profile', 'my-requests'])
+    expect(pages).toEqual(['chat', 'check-in', 'home', 'my-attendance', 'my-documents', 'my-pay', 'my-profile', 'my-requests', 'tasks'])
+  })
+
+  it('gives everyone tasks and chat at the top, right after their home page', () => {
+    for (const session of [...Object.values(sessions), { ...sessions.admin, employee: null }]) {
+      const [first] = navigationFor(session)
+      expect(first.items.map((entry) => entry.id)).toEqual([defaultPage(session), 'tasks', 'chat'])
+      expect(locatePage(session, 'chat')).toEqual({ group: null, label: 'Chat' })
+    }
   })
 
   it('opens the QR check-in page for anyone who checks in, without listing it', () => {
@@ -86,11 +94,11 @@ describe('the phone tab bar', () => {
   const labels = (session) => quickNavFor(session).map((entry) => entry.label)
 
   it('gives each role its most used pages, all of them pages it may open', () => {
-    expect(ids(sessions.hr)).toEqual(['dashboard', 'employees', 'requests', 'attendance'])
-    expect(ids(sessions.manager)).toEqual(['home', 'my-team', 'requests', 'my-requests'])
-    expect(labels(sessions.manager)).toEqual(['Home', 'Team', 'Approvals', 'Requests'])
-    expect(ids(sessions.employee)).toEqual(['home', 'my-attendance', 'my-requests', 'my-pay'])
-    expect(labels(sessions.employee)).toEqual(['Home', 'Attendance', 'Requests', 'Pay'])
+    expect(ids(sessions.hr)).toEqual(['dashboard', 'employees', 'requests', 'chat'])
+    expect(ids(sessions.manager)).toEqual(['home', 'requests', 'tasks', 'chat'])
+    expect(labels(sessions.manager)).toEqual(['Home', 'Approvals', 'Tasks', 'Chat'])
+    expect(ids(sessions.employee)).toEqual(['home', 'my-attendance', 'tasks', 'chat'])
+    expect(labels(sessions.employee)).toEqual(['Home', 'Attendance', 'Tasks', 'Chat'])
     for (const session of Object.values(sessions)) {
       const allowed = allowedPages(session)
       for (const id of ids(session)) expect(allowed.has(id)).toBe(true)
@@ -98,6 +106,6 @@ describe('the phone tab bar', () => {
   })
 
   it('leaves out the self-service pages for an administrator with no employee record', () => {
-    expect(ids({ ...sessions.admin, employee: null })).toEqual(['dashboard', 'employees', 'requests', 'attendance'])
+    expect(ids({ ...sessions.admin, employee: null })).toEqual(['dashboard', 'employees', 'requests', 'chat'])
   })
 })

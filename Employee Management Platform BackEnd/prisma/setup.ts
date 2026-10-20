@@ -285,6 +285,11 @@ async function countRealRecords(client: PrismaClient): Promise<{ people: number;
 
 /** Every table, children first - the same order as the seed's reset. */
 async function clearDatabase(tx: Prisma.TransactionClient): Promise<void> {
+  await tx.chatMessage.deleteMany();
+  await tx.conversationMember.deleteMany();
+  await tx.conversation.deleteMany();
+  await tx.taskComment.deleteMany();
+  await tx.task.deleteMany();
   await tx.overtimeEntry.deleteMany();
   await tx.salaryAdvanceInstallment.deleteMany();
   await tx.payrollAdjustment.deleteMany();

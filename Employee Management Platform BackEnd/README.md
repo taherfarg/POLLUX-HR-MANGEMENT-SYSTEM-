@@ -132,6 +132,7 @@ src/
     ├── leave/  requests/                     types, holidays, balances; the approval engine
     ├── advances/  payroll/                   advances, payroll engine, payslips, adjustments
     ├── documents/  reports/  dashboard/  notifications/  audit/  ai/
+    ├── tasks/  chat/                         work with comments; direct and group conversations
 ```
 
 **Cross-cutting decisions.**
@@ -304,6 +305,30 @@ HR_ADMIN.
 | GET | `/audit-logs` | HR, read-only: `action`, `entityType`, `entityId`, `actorUserId`, `from`, `to`, `q` |
 </details>
 
+<details>
+<summary><b>Tasks and chat</b></summary>
+
+| Method | Path | Who / notes |
+|---|---|---|
+| GET | `/tasks` | `view=mine\|created\|team\|all` (`all` is HR, entity-scoped), `status=open\|all\|TODO\|IN_PROGRESS\|DONE\|CANCELLED`, `q`, `assigneeId`; returns `summary` (to do, in progress, overdue, done this week) |
+| POST | `/tasks` | `title`, `description?`, `priority`, `dueDate?`, `assigneeId?` (omitted: yourself). Yourself, a direct report, or anyone in scope for HR. Notifies the assignee |
+| GET | `/tasks/assignees` | Who the caller may give a task to |
+| GET | `/tasks/:id` | With comments. Assignee, creator, assignee's manager, HR in scope; anyone else gets 404 |
+| PATCH | `/tasks/:id` | `status` by anyone who can see it; title, details, priority, due date, assignee, cancelling: creator or HR. Audited; notifies the other side |
+| DELETE | `/tasks/:id` | Creator or HR. Audited |
+| POST | `/tasks/:id/comments` | Anyone who can see the task; notifies assignee and creator |
+| GET | `/chat/unread` | `{ messages, conversations }` for the navigation badge |
+| GET | `/chat/contacts?q=` | Active colleagues with a login |
+| GET · POST | `/chat/conversations` | List with unread counts; create `{ kind: 'DIRECT', userId }` (returns the existing chat with that person, 200) or `{ kind: 'GROUP', title, userIds }` (201) |
+| GET · PATCH | `/chat/conversations/:id` | Members only (404 otherwise). PATCH renames a group |
+| POST | `/chat/conversations/:id/members` · `/leave` · `/read` | Add people to a group · leave it · mark read up to the newest message |
+| GET | `/chat/conversations/:id/messages` | Newest 50 and `hasMore`; `before=<instant>` for older; `since=<instant>` for polling (new and deleted messages) |
+| POST · DELETE | `/chat/conversations/:id/messages`, `/messages/:messageId` | Send (1–4000 characters); unsend your own |
+
+Signed-in API calls are rate limited per account rather than per IP, so an office behind
+one address and chat's background polling never lock each other out.
+</details>
+
 ---
 
 ## AI letter drafting
@@ -362,7 +387,7 @@ tracked from the day after setup. Walkthrough: [DEPLOYMENT.md, step 4a](../DEPLO
 TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?schema=public npm test
 ```
 
-**311 tests across 16 files**, against a real PostgreSQL test database:
+**335 tests across 18 files**, against a real PostgreSQL test database:
 
 | File | Covers |
 |---|---|
@@ -379,6 +404,8 @@ TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?sc
 | `administration.test.ts` | Users & roles, leave balances, reports, document library, dashboards per role |
 | `clean-start.test.ts` | `db:setup`: reading the accounts, the result, sign-in, single-approver payroll, the wipe guard |
 | `onsite.test.ts` | On-site check-in: distance, network matching, private addresses; QR code, position and network enforced on check-in and check-out; refusals audited; the code hidden from all but HR |
+| `tasks.test.ts` | Who may give a task to whom, the four lists, overdue, assignee vs creator rights, comments, notifications, audit |
+| `chat.test.ts` | One direct chat per pair, unread counts, polling with deletions, groups, privacy from HR and admins, per-account rate limit key |
 | `report-export.test.ts` | CSV/Excel/PDF writers, formula-injection neutralising |
 | `working-days.test.ts` | Leave day counting |
 

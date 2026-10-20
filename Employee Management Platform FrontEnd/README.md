@@ -41,9 +41,9 @@ environment variable is needed locally. `npm run build` produces `dist/`.
 
 | Role | Navigation |
 |---|---|
-| Administrator / HR | **Dashboard** · **People**: Employees, Departments, Work locations · **Time**: Attendance, Timesheets, Work schedules, Overtime · **Leave**: Requests, Leave balances, Holidays · **Payroll**: Payroll runs, Salary advances, Bonuses & deductions, Payslips · Documents · Reports · **Administration**: Users & roles, Audit logs, Company settings · **Me**: own attendance, requests, pay, profile |
-| Manager | Home · **Me**: My attendance, My requests, My pay, My documents, My profile · **My team**: Team, Team attendance, Approvals, Overtime, Reports (team reports only — never pay) |
-| Employee | Home · **Me**: My attendance, My requests, My pay, My documents, My profile |
+| Administrator / HR | **Dashboard** · Tasks · Chat · **People**: Employees, Departments, Work locations · **Time**: Attendance, Timesheets, Work schedules, Overtime · **Leave**: Requests, Leave balances, Holidays · **Payroll**: Payroll runs, Salary advances, Bonuses & deductions, Payslips · Documents · Reports · **Administration**: Users & roles, Audit logs, Company settings · **Me**: own attendance, requests, pay, profile |
+| Manager | Home · Tasks · Chat · **Me**: My attendance, My requests, My pay, My documents, My profile · **My team**: Team, Team attendance, Approvals, Overtime, Reports (team reports only — never pay) |
+| Employee | Home · Tasks · Chat · **Me**: My attendance, My requests, My pay, My documents, My profile |
 
 Company settings can be changed by an administrator only; HR sees them read-only. There
 is no legal-entity page: Pollux is one company, and the entity lives on in the database
@@ -97,12 +97,12 @@ src/
 ## Tests
 
 ```bash
-npm test        # 66 unit tests: API client, adapters, formatting, role navigation and tab bar, audit diff, demo logins, on-site check-in, appearance
+npm test        # 73 unit tests: API client, adapters, formatting, role navigation and tab bar, audit diff, demo logins, on-site check-in, appearance, task due dates, chat threads
 npm run build
 ```
 
 The UI is exercised end to end by the Playwright suite in [`../e2e`](../e2e): attendance,
-leave, salary advance, payroll and payslip flows, permission boundaries and phone layouts
+leave, salary advance, payroll and payslip flows, tasks and chat between two people, permission boundaries and phone layouts
 against the real API and database.
 
 See the [backend README](../Employee%20Management%20Platform%20BackEnd/README.md) for the

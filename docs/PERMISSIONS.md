@@ -55,6 +55,8 @@ HR admin. Every "HR" cell below means *HR within their scope*.
 | Company settings | public subset (name, logo, currency, timezone, week, pay day) | public subset | read full policy | read and **change** |
 | Users & roles | ✖ | ✖ | create/manage EMPLOYEE and MANAGER logins | everything |
 | Audit logs | ✖ | ✖ | read (scoped HR: own entity only) | read |
+| Tasks | own to-dos; tasks given to them (move along, comment) | + give tasks to direct reports, see the team's | + give tasks to anyone in scope; see, rewrite, cancel or delete every task in scope | same |
+| Chat | conversations they are a member of | same | **same — no access to other people's chats** | **same** |
 
 ¹ Four-eyes: with `payrollRequiresSeparateApprover` on (the default), whoever calculated
 the payroll cannot approve it, and whoever entered a bonus or deduction cannot approve it.
@@ -78,6 +80,8 @@ the payroll cannot approve it, and whoever entered a bonus or deduction cannot a
 | Reading another person's salary or a payroll register is itself audited (`VIEW_SENSITIVE`); every export is audited (`EXPORT`) | services + `reports.service.ts` |
 | Restricted fields are **absent** from responses, not `null` — serializers build responses field by field | `employee.serializer.ts`, `serializeRecord`, … |
 | Payslip PDFs are served with `Cache-Control: private, no-store` and only after the same pay-data check | `payroll.routes.ts`, `common/http.ts` |
+| A task goes to yourself, a direct report, or (HR) anyone in scope; the assignee moves it along, only its creator or HR rewrites, cancels or deletes it | `canAssignTaskTo`, `canEditTask`, `canProgressTask` |
+| A chat is read by its members only; every chat query is scoped by membership and a non-member gets 404 — there is no HR or admin override | `chat.service.ts` (`requireMembership`) |
 
 ---
 

@@ -388,3 +388,52 @@ export function employeeCapabilities(auth: AuthContext, employee: EmployeeAccess
 }
 
 export type EmployeeCapabilities = ReturnType<typeof employeeCapabilities>;
+
+// ---------------------------------------------------------------------------
+// Pollux HR: tasks
+// ---------------------------------------------------------------------------
+
+/**
+ * Who may give a task to an employee: the employee themselves (a personal
+ * to-do), their direct manager, or HR within scope. A colleague may not hand
+ * work to someone they do not manage.
+ */
+export function canAssignTaskTo(auth: AuthContext, assignee: EmployeeAccessSubject): boolean {
+  return isSelf(auth, assignee) || isDirectManagerOf(auth, assignee) || managesEmployee(auth, assignee);
+}
+
+export function assertCanAssignTaskTo(auth: AuthContext, assignee: EmployeeAccessSubject): void {
+  if (!canAssignTaskTo(auth, assignee)) {
+    throw new ForbiddenError('You can only give tasks to yourself or to people you manage');
+  }
+}
+
+/** The shape any task check needs: who it is for and who created it. */
+export interface TaskAccessSubject {
+  createdById: string | null;
+  assignee: EmployeeAccessSubject;
+}
+
+/** A task is visible to its assignee, its creator, the assignee's manager and HR within scope. */
+export function canViewTask(auth: AuthContext, task: TaskAccessSubject): boolean {
+  return (
+    task.createdById === auth.userId ||
+    isSelf(auth, task.assignee) ||
+    isDirectManagerOf(auth, task.assignee) ||
+    managesEmployee(auth, task.assignee)
+  );
+}
+
+/**
+ * Rewriting a task - its title, due date, priority or assignee - or cancelling
+ * or deleting it: the person who created it, or HR within scope. The assignee
+ * moves it along but cannot quietly change what was asked of them.
+ */
+export function canEditTask(auth: AuthContext, task: TaskAccessSubject): boolean {
+  return task.createdById === auth.userId || managesEmployee(auth, task.assignee);
+}
+
+/** Moving a task between to do, in progress and done: anyone who can see it. */
+export function canProgressTask(auth: AuthContext, task: TaskAccessSubject): boolean {
+  return canViewTask(auth, task);
+}

@@ -432,6 +432,40 @@ export async function fetchMyTeam() {
   return adaptEmployees(response.data)
 }
 
+// --- Tasks ------------------------------------------------------------------
+
+export async function fetchTasks(query = {}) {
+  return list(await api.get('/tasks', { pageSize: 50, ...query }))
+}
+export const fetchTask = async (id) => (await api.get(`/tasks/${id}`)).data
+export const fetchTaskAssignees = async (q) => (await api.get('/tasks/assignees', { q })).data
+export const createTask = async (payload) => (await api.post('/tasks', payload)).data
+export const updateTask = async (id, payload) => (await api.patch(`/tasks/${id}`, payload)).data
+export const deleteTask = async (id) => (await api.delete(`/tasks/${id}`)).data
+export const addTaskComment = async (id, body) => (await api.post(`/tasks/${id}/comments`, { body })).data
+
+// --- Chat -------------------------------------------------------------------
+
+export const fetchChatUnread = async () => (await api.get('/chat/unread')).data
+export const fetchChatContacts = async (q) => (await api.get('/chat/contacts', { q })).data
+export async function fetchConversations() {
+  const response = await api.get('/chat/conversations')
+  return { items: response.data ?? [], totalUnread: response.totalUnread ?? 0 }
+}
+export const fetchConversation = async (id) => (await api.get(`/chat/conversations/${id}`)).data
+export const openDirectChat = async (userId) => (await api.post('/chat/conversations', { kind: 'DIRECT', userId })).data
+export const createGroupChat = async (title, userIds) => (await api.post('/chat/conversations', { kind: 'GROUP', title, userIds })).data
+export const renameGroupChat = async (id, title) => (await api.patch(`/chat/conversations/${id}`, { title })).data
+export const addChatMembers = async (id, userIds) => (await api.post(`/chat/conversations/${id}/members`, { userIds })).data
+export const leaveGroupChat = async (id) => (await api.post(`/chat/conversations/${id}/leave`)).data
+export const markConversationRead = async (id) => (await api.post(`/chat/conversations/${id}/read`)).data
+export async function fetchMessages(id, query = {}) {
+  const response = await api.get(`/chat/conversations/${id}/messages`, query)
+  return { items: response.data ?? [], hasMore: Boolean(response.hasMore) }
+}
+export const sendChatMessage = async (id, body) => (await api.post(`/chat/conversations/${id}/messages`, { body })).data
+export const deleteChatMessage = async (id, messageId) => (await api.delete(`/chat/conversations/${id}/messages/${messageId}`)).data
+
 // --- Dashboard, notifications and audit -----------------------------------
 
 export async function fetchDashboard() {
