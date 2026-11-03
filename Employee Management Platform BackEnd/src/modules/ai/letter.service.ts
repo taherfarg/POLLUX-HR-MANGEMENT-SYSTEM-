@@ -183,7 +183,7 @@ export function buildTemplateLetter(facts: LetterFacts): GeneratedLetter {
 // ---------------------------------------------------------------------------
 
 /** Fast and inexpensive, and letter drafting is a formulaic task. */
-const LETTER_MODEL = 'gemini-2.5-flash';
+const LETTER_MODEL = env.GOOGLE_AI_MODEL;
 
 let client: GoogleGenAI | null = null;
 

@@ -65,6 +65,7 @@ Responses are `{ data }`, lists `{ data, meta, summary }`, errors
 | `audit`, `notifications` | read-only audit trail; in-app notifications |
 | `tasks` | tasks with priority, due date, status and comments; four lists (mine, created, team, all) |
 | `chat` | direct and group conversations, unread counts, polling for changes since a moment; members-only |
+| `assistant` | Gemini function calling over read-only tools that wrap the reports, the attendance board, the request inbox and tasks, run as the caller |
 
 ### Shared services (`src/services`)
 
@@ -137,6 +138,7 @@ Decisions worth knowing:
 | `20260925120000_pollux_payroll_sources` | source links from overtime, adjustments and instalments to payroll lines |
 | `20260925130000_pollux_attendance_start` | `attendanceStartDate` (backfilled to the migration date, so no history becomes "absent") |
 | `20260926100000_pollux_onsite_checkin` | On-site check-in: a location's QR code, position, radius, office networks and Wi-Fi name; the verification kept with each check-in and check-out |
+| `20261103100000_pollux_ai_assistant` | `AI_QUERY` audit action |
 | `20261020100000_pollux_tasks_chat` | Tasks and task comments; conversations, members (with their read mark) and messages; three task notification types. Additive only |
 
 ---

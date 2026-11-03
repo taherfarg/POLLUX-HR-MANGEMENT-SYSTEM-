@@ -34,12 +34,19 @@ const ACTIONS = [
   'LOGIN_FAILED',
   'LOGOUT',
   'PASSWORD_CHANGE',
+  'AI_QUERY',
 ]
 
+/** Actions whose enum name does not read well as a sentence. */
+const ACTION_LABELS = { AI_QUERY: 'AI query', VIEW_SENSITIVE: 'View sensitive' }
+const actionLabel = (value) => ACTION_LABELS[value] ?? humanize(value)
+
 const ENTITY_TYPES = [
+  ['Assistant', 'Assistant'],
   ['AttendanceRecord', 'Attendance'],
   ['CompanySettings', 'Company settings'],
   ['CompensationRecord', 'Compensation'],
+  ['Conversation', 'Chat group'],
   ['Department', 'Department'],
   ['Document', 'Document'],
   ['Employee', 'Employee'],
@@ -54,6 +61,7 @@ const ENTITY_TYPES = [
   ['Report', 'Report export'],
   ['Request', 'Request'],
   ['SalaryAdvance', 'Salary advance'],
+  ['Task', 'Task'],
   ['User', 'User'],
   ['WorkLocation', 'Work location'],
   ['WorkSchedule', 'Work schedule'],
@@ -78,6 +86,7 @@ const ACTION_TONES = {
   EXPORT: 'violet',
   VIEW_SENSITIVE: 'violet',
   PASSWORD_CHANGE: 'warning',
+  AI_QUERY: 'violet',
 }
 
 /**
@@ -115,7 +124,7 @@ export default function AuditLogsPage() {
       <Panel flush>
         <div className="toolbar">
           <SearchInput value={query} onChange={setQuery} placeholder="Summary or person" label="Search the audit trail" />
-          <FilterSelect label="Action" value={action} onChange={setAction} options={[{ value: '', label: 'All actions' }, ...ACTIONS.map((value) => ({ value, label: humanize(value) }))]} />
+          <FilterSelect label="Action" value={action} onChange={setAction} options={[{ value: '', label: 'All actions' }, ...ACTIONS.map((value) => ({ value, label: actionLabel(value) }))]} />
           <FilterSelect
             label="Record type"
             value={entityType}
@@ -147,7 +156,7 @@ export default function AuditLogsPage() {
                   </div>
                 ),
               },
-              { key: 'action', label: 'Action', render: (row) => <StatusPill tone={ACTION_TONES[row.action] ?? 'neutral'} label={humanize(row.action)} /> },
+              { key: 'action', label: 'Action', render: (row) => <StatusPill tone={ACTION_TONES[row.action] ?? 'neutral'} label={actionLabel(row.action)} /> },
               { key: 'actor', label: 'By', render: (row) => row.actorLabel },
             ]}
             rows={logs.data?.items ?? []}
@@ -173,7 +182,7 @@ function AuditEntry({ entry }) {
         <div>
           <dt>Action</dt>
           <dd>
-            <StatusPill tone={ACTION_TONES[entry.action] ?? 'neutral'} label={humanize(entry.action)} />
+            <StatusPill tone={ACTION_TONES[entry.action] ?? 'neutral'} label={actionLabel(entry.action)} />
           </dd>
         </div>
         <div>

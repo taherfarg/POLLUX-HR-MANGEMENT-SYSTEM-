@@ -19,6 +19,7 @@ Design documents: [architecture](../docs/POLLUX-HR-ARCHITECTURE.md) ·
 - [Data model](#data-model)
 - [Permissions and privacy](#permissions-and-privacy)
 - [API reference](#api-reference)
+- [HR assistant](#hr-assistant)
 - [AI letter drafting](#ai-letter-drafting)
 - [Demo data and accounts](#demo-data-and-accounts)
 - [Testing](#testing)
@@ -80,7 +81,9 @@ stops the process with a readable message.
 | `RATE_LIMIT_AUTH_MAX` / `RATE_LIMIT_API_MAX` | no | Per IP: 10 sign-in attempts per 15 min / 300 requests per minute |
 | `TRUST_PROXY` | no | Proxy hops in front of the API, for reading the visitor's IP (default `1`, right for Render). The office-network check and the rate limiter depend on it; Work locations → "Add the network I'm on now" shows the address it yields |
 | `SEED_DEMO_PASSWORD` | no | Password of the seeded demo logins (default `Passw0rd!23`, demo only) |
-| `GOOGLE_API_KEY` | no | AI letter drafting; templates are used without it |
+| `GOOGLE_API_KEY` | no | Switches on the HR assistant and AI letter drafting; without it the assistant is off and letters use templates |
+| `GOOGLE_AI_MODEL` | no | Gemini model for both (default `gemini-2.5-flash`) |
+| `AI_ASSISTANT_HOURLY_LIMIT` | no | Assistant questions per person per hour (default `60`) |
 | `LOG_LEVEL`, `PORT`, `NODE_ENV` | no | |
 
 Company policy is **not** configured here: working week, grace minutes, overtime rates,
@@ -306,6 +309,15 @@ HR_ADMIN.
 </details>
 
 <details>
+<summary><b>Assistant</b></summary>
+
+| Method | Path | Who / notes |
+|---|---|---|
+| GET | `/assistant/status` | Managers and HR: `{ enabled, scope: 'company' \| 'team' }` |
+| POST | `/assistant/ask` | `{ messages: [{ role: 'user' \| 'assistant', text }] }`, ending with the question (up to 20 turns). Returns `{ answer, sources }`. Audited; per-person hourly limit; `503` when not configured |
+</details>
+
+<details>
 <summary><b>Tasks and chat</b></summary>
 
 | Method | Path | Who / notes |
@@ -328,6 +340,33 @@ HR_ADMIN.
 Signed-in API calls are rate limited per account rather than per IP, so an office behind
 one address and chat's background polling never lock each other out.
 </details>
+
+---
+
+## HR assistant
+
+Managers, HR and administrators ask in their own words — *"ملخص الحضور النهارده"*,
+*"who was late most often last month?"* — and Gemini answers from Pollux HR's own data.
+
+- **The model never touches the database.** It picks among read-only tools
+  ([`assistant.tools.ts`](src/modules/assistant/assistant.tools.ts)): attendance today,
+  the attendance, late, absence, leave, leave-balance and overtime reports, the employee
+  list (HR), my team, requests waiting for a decision, and tasks. Each runs the existing
+  service **as the person asking**, so a manager's questions reach their direct reports
+  only and a scoped HR admin's their entity only — the same rules as the pages, enforced
+  in the same code.
+- **No pay.** There is no payroll, payslip, salary or advance tool; no amount is ever sent
+  to Google.
+- **Read-only, audited, capped.** It cannot change anything; every question is kept in
+  the audit trail (`AI_QUERY`); each person may ask `AI_ASSISTANT_HOURLY_LIMIT` questions
+  an hour.
+- Names are resolved to people within the caller's reach, and an ambiguous name comes back
+  as candidates for the model to ask about. A refused or invalid look-up (a range too long,
+  someone outside the team) is handed back to the model to explain, not raised.
+- Answers follow the language of the question, name their sources, and are rendered from a
+  small Markdown subset without HTML.
+- Without `GOOGLE_API_KEY` the page says it is not switched on and `/assistant/ask` returns
+  `503 ASSISTANT_UNAVAILABLE`.
 
 ---
 
@@ -387,7 +426,7 @@ tracked from the day after setup. Walkthrough: [DEPLOYMENT.md, step 4a](../DEPLO
 TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?schema=public npm test
 ```
 
-**335 tests across 18 files**, against a real PostgreSQL test database:
+**347 tests across 19 files**, against a real PostgreSQL test database:
 
 | File | Covers |
 |---|---|
@@ -405,6 +444,7 @@ TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?sc
 | `clean-start.test.ts` | `db:setup`: reading the accounts, the result, sign-in, single-approver payroll, the wipe guard |
 | `onsite.test.ts` | On-site check-in: distance, network matching, private addresses; QR code, position and network enforced on check-in and check-out; refusals audited; the code hidden from all but HR |
 | `tasks.test.ts` | Who may give a task to whom, the four lists, overdue, assignee vs creator rights, comments, notifications, audit |
+| `assistant.test.ts` | The assistant with a scripted model: who may use it, every tool runs, a manager's tools and results stay inside the team, scoped HR stays in its entity, ambiguous names, refusals passed back, the round limit, failures, audit |
 | `chat.test.ts` | One direct chat per pair, unread counts, polling with deletions, groups, privacy from HR and admins, per-account rate limit key |
 | `report-export.test.ts` | CSV/Excel/PDF writers, formula-injection neutralising |
 | `working-days.test.ts` | Leave day counting |

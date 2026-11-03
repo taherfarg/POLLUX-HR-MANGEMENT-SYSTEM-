@@ -55,12 +55,14 @@ describe('navigation by role', () => {
     expect(pages).toEqual(['chat', 'check-in', 'home', 'my-attendance', 'my-documents', 'my-pay', 'my-profile', 'my-requests', 'tasks'])
   })
 
-  it('gives everyone tasks and chat at the top, right after their home page', () => {
+  it('gives everyone tasks and chat at the top, and the assistant to managers and HR only', () => {
     for (const session of [...Object.values(sessions), { ...sessions.admin, employee: null }]) {
       const [first] = navigationFor(session)
-      expect(first.items.map((entry) => entry.id)).toEqual([defaultPage(session), 'tasks', 'chat'])
+      const assistant = session.isManagement || session.isManager ? ['assistant'] : []
+      expect(first.items.map((entry) => entry.id)).toEqual([defaultPage(session), ...assistant, 'tasks', 'chat'])
       expect(locatePage(session, 'chat')).toEqual({ group: null, label: 'Chat' })
     }
+    expect(allowedPages(sessions.employee).has('assistant')).toBe(false)
   })
 
   it('opens the QR check-in page for anyone who checks in, without listing it', () => {

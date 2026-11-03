@@ -50,12 +50,14 @@ import MyTeamPage from './pages/MyTeamPage.jsx'
 import CheckInPage from './pages/CheckInPage.jsx'
 import TasksPage from './pages/TasksPage.jsx'
 import ChatPage from './pages/ChatPage.jsx'
+import AssistantPage from './pages/AssistantPage.jsx'
 
 const PAGE_COMPONENTS = {
   dashboard: DashboardPage,
   home: HomePage,
   tasks: TasksPage,
   chat: ChatPage,
+  assistant: AssistantPage,
   employees: EmployeesPage,
   departments: DepartmentsPage,
   'work-locations': WorkLocationsPage,

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { AUTH_EXPIRED_EVENT, tokenStore } from '../api/client.js'
+import { forgetConversations } from '../lib/assistant.js'
 import * as apiEndpoints from '../api/endpoints.js'
 
 const AuthContext = createContext(null)
@@ -57,6 +58,7 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     await apiEndpoints.logout()
+    forgetConversations()
     setSession(null)
   }, [])
 

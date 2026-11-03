@@ -22,6 +22,7 @@ import {
   Scale,
   Settings,
   ShieldCheck,
+  Sparkles,
   Timer,
   UserRound,
   UsersRound,
@@ -38,6 +39,7 @@ export const PAGES = {
   home: { title: 'Home', description: 'Your day, your time off and your pay at a glance.', icon: Home },
   tasks: { title: 'Tasks', description: 'Work given to you, by you and to your team.', icon: ListTodo },
   chat: { title: 'Chat', description: 'Messages with colleagues, one to one or in groups.', icon: MessagesSquare },
+  assistant: { title: 'Assistant', description: 'Ask about attendance, leave, approvals and tasks in your own words.', icon: Sparkles },
 
   employees: { title: 'Employees', description: 'Everyone at Pollux Motors - office, field and remote.', icon: UsersRound },
   departments: { title: 'Departments', description: 'Teams and who leads them.', icon: Building2 },
@@ -83,7 +85,7 @@ export function navigationFor(session) {
 
   if (session.isManagement) {
     return [
-      { label: null, items: [item('dashboard'), item('tasks'), item('chat')] },
+      { label: null, items: [item('dashboard'), item('assistant'), item('tasks'), item('chat')] },
       { label: 'People', items: [item('employees'), item('departments'), item('work-locations')] },
       { label: 'Time', items: [item('attendance'), item('timesheets'), item('work-schedules'), item('overtime')] },
       { label: 'Leave', items: [item('requests'), item('leave-balances'), item('holidays')] },
@@ -96,7 +98,7 @@ export function navigationFor(session) {
 
   if (session.isManager) {
     return [
-      { label: null, items: [item('home'), item('tasks'), item('chat')] },
+      { label: null, items: [item('home'), item('assistant'), item('tasks'), item('chat')] },
       { label: 'Me', items: [...self.slice(0, 3), item('my-documents'), item('my-profile')] },
       {
         label: 'My team',

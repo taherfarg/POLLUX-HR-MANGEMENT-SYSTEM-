@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { advancesRouter } from './modules/advances/advances.routes';
+import { assistantRouter } from './modules/assistant/assistant.routes';
 import { attendanceRouter } from './modules/attendance/attendance.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { auditRouter } from './modules/audit/audit.routes';
@@ -56,6 +57,7 @@ apiRouter.get('/', (_req, res) => {
         notifications: '/api/v1/notifications',
         tasks: '/api/v1/tasks',
         chat: '/api/v1/chat',
+        assistant: '/api/v1/assistant',
         settings: '/api/v1/settings',
         auditLogs: '/api/v1/audit-logs',
         legalEntities: '/api/v1/legal-entities',
@@ -87,5 +89,6 @@ apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/tasks', tasksRouter);
 apiRouter.use('/chat', chatRouter);
+apiRouter.use('/assistant', assistantRouter);
 apiRouter.use('/settings', settingsRouter);
 apiRouter.use('/audit-logs', auditRouter);

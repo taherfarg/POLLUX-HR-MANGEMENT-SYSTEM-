@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Sparkles } from 'lucide-react'
 import { Avatar } from './ui.jsx'
-import { navigationFor } from '../navigation.js'
+import { allowedPages, navigationFor } from '../navigation.js'
 import { fetchEmployees } from '../api/endpoints.js'
 
 /**
@@ -51,7 +51,12 @@ function Palette({ onClose, session, onNavigate }) {
     searchesPeople && term.length >= 2 && people.term === term
       ? people.items.map((person) => ({ key: `person:${person.id}`, kind: 'person', id: person.id, label: person.fullName, hint: `${person.role ?? ''} · ${person.department}`, person }))
       : []
-  const results = [...pageResults, ...personResults]
+  // Anything longer than a word can go to the assistant as a question.
+  const askResults =
+    query.trim().length >= 3 && allowedPages(session).has('assistant')
+      ? [{ key: 'ask', kind: 'ask', label: `Ask: “${query.trim()}”`, icon: Sparkles }]
+      : []
+  const results = [...pageResults, ...personResults, ...askResults]
   const current = Math.min(active, Math.max(results.length - 1, 0))
 
   useEffect(() => setActive(0), [term])
@@ -67,6 +72,7 @@ function Palette({ onClose, session, onNavigate }) {
   const choose = (result) => {
     onClose()
     if (result.kind === 'page') onNavigate(result.id)
+    else if (result.kind === 'ask') onNavigate('assistant', query.trim())
     else onNavigate('employees', result.id)
   }
 
@@ -117,7 +123,7 @@ function Palette({ onClose, session, onNavigate }) {
                 <Fragment key={result.key}>
                   {heading && (
                     <li className="palette-heading" role="presentation">
-                      {result.kind === 'page' ? 'Pages' : 'People'}
+                      {result.kind === 'page' ? 'Pages' : result.kind === 'ask' ? 'Assistant' : 'People'}
                     </li>
                   )}
                   <li
@@ -128,7 +134,7 @@ function Palette({ onClose, session, onNavigate }) {
                     onMouseMove={() => index !== current && setActive(index)}
                     onClick={() => choose(result)}
                   >
-                    {result.kind === 'page' ? <Icon size={18} aria-hidden="true" /> : <Avatar employee={result.person} size="xs" />}
+                    {result.kind === 'person' ? <Avatar employee={result.person} size="xs" /> : <Icon size={18} aria-hidden="true" />}
                     <span>
                       <strong>{result.label}</strong>
                       {result.kind === 'person' && <small>{result.hint}</small>}

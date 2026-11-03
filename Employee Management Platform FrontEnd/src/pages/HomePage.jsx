@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlarmClock, CalendarPlus, CheckCircle2, ClipboardCheck, FileText, HandCoins, Palmtree, ReceiptText, UserX, UsersRound } from 'lucide-react'
+import { AlarmClock, CalendarPlus, CheckCircle2, ClipboardCheck, FileText, HandCoins, Palmtree, ReceiptText, Sparkles, UserX, UsersRound } from 'lucide-react'
 import { Async, EmptyMini, Money, PageHero, Panel, StatCard, StatusPill } from '../components/ui.jsx'
 import { AttendanceStatus, CheckInCard } from '../components/attendance.jsx'
 import { BalanceCards } from '../components/leave.jsx'
@@ -26,7 +26,18 @@ export default function HomePage({ session, navigate, onToast }) {
 
   return (
     <div className="page">
-      <PageHero name={session.employee?.firstName}>Your day, your time off and your pay at a glance.</PageHero>
+      <PageHero
+        name={session.employee?.firstName}
+        actions={
+          session.isManager && (
+            <button className="button button-secondary" onClick={() => navigate('assistant', 'brief')}>
+              <Sparkles size={16} /> Team brief
+            </button>
+          )
+        }
+      >
+        Your day, your time off and your pay at a glance.
+      </PageHero>
       <div className="grid-main-side">
         <div className="page">
           {session.employee && <CheckInCard onToast={onToast} />}

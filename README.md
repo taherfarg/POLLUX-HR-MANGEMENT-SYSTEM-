@@ -29,6 +29,7 @@ each judged against their own schedule, timezone and holiday calendar.
 | **Leave** | Requests with a live preview of the working days they cost; HR can record leave on someone's behalf, including leave that has already started, and approve it in one step, and cancel approved leave that was recorded wrongly (with a reason; the days go back to the balance); balances shown as *entitlement + carried − used − pending = available*; UAE holiday calendar by default, other calendars assigned per person |
 | **Payroll** | Monthly runs `Draft → Calculated → Reviewed → Approved → Paid` with four-eyes approval, month locking and admin-only reopen; salary advances repaid in instalments; bonuses and deductions; PDF payslips stored at approval |
 | **Tasks** | Work given to a person by themselves, their manager or HR — priority, due date, *to do → in progress → done*, and a comment thread; lists for *assigned to me*, *assigned by me*, *my team* and (HR) *everyone*, with overdue counted in the office's timezone; the assignee moves a task along, only its creator or HR can rewrite, cancel or delete it; each step notifies the other side |
+| **Assistant** | Managers and HR ask in their own words, in English or Arabic — *"ملخص الحضور النهارده"*, *"who was late most often last month?"*, *"what is waiting for my approval?"* — and Google Gemini answers from Pollux HR's own reports, as the person asking: a manager only ever hears about their own team, and no salary is ever sent to the model. Read-only, every question audited, a *Daily brief* on the dashboard, and any question typed into search can be sent to it |
 | **Chat** | One-to-one and group conversations between colleagues: unread counts in the navigation and on the phone tab bar, day separators, unsending your own message, adding people to a group, renaming and leaving it; new messages arrive without a reload. A conversation is readable by its members only — HR and administrators included |
 | **Reports** | Attendance, late arrivals, absence, overtime, leave, leave balance, payroll, salary advances, employees — preview on screen, export as CSV, Excel or PDF, every export audited |
 | **Administration** | Users & roles, audit logs with before/after, company settings — every policy number lives in the database, not in code |
@@ -87,6 +88,8 @@ each judged against their own schedule, timezone and holiday calendar.
   one file, [`services/access.ts`](Employee%20Management%20Platform%20BackEnd/src/services/access.ts),
   and proven by the E2E suite with each role's own token.
 - **Nobody approves their own request, overtime, advance or payroll.**
+- **The assistant sees what you see, and never pay.** It answers through the same
+  services as the pages, run as the person asking, and has no payroll or salary tool.
 - **Chats are private to their members.** There is no endpoint through which HR or an
   administrator can list or read other people's conversations.
 - **Every sensitive action is audited** — corrections, approvals, payroll steps, exports,
@@ -148,9 +151,9 @@ preinstalled Chromium.
 
 | Suite | Result |
 |---|---|
-| Backend integration — Vitest + Supertest against PostgreSQL | **335 / 335** |
-| Frontend unit — client, adapters, formatting, navigation and the phone tab bar, audit diff, demo logins, on-site helpers, appearance, task due dates, chat threads | **73 / 73** |
-| E2E — Playwright, real stack, 1440×900 and 390×844 | **30 / 30** |
+| Backend integration — Vitest + Supertest against PostgreSQL | **347 / 347** |
+| Frontend unit — client, adapters, formatting, navigation and the phone tab bar, audit diff, demo logins, on-site helpers, appearance, task due dates, chat threads, assistant answers and conversation | **79 / 79** |
+| E2E — Playwright, real stack, 1440×900 and 390×844 | **32 / 32** |
 | Typecheck · backend build · frontend build · migrations from empty + seed | clean |
 
 ## Stack
@@ -170,7 +173,7 @@ No new framework was introduced: Pollux HR was built by extending the
 | [docs/PERMISSIONS.md](docs/PERMISSIONS.md) | Who can see and do what, and where each rule is enforced |
 | [docs/POLLUX-HR-MIGRATION-PLAN.md](docs/POLLUX-HR-MIGRATION-PLAN.md) | The audit and plan written before the first change |
 | [Backend README](Employee%20Management%20Platform%20BackEnd/README.md) · [Frontend README](Employee%20Management%20Platform%20FrontEnd/README.md) | Running, environment, API reference |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Render + Neon; QR check-in setup; daily encrypted backups to Google Drive |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Render + Neon; QR check-in setup; daily encrypted backups to Google Drive; switching on the assistant |
 
 ## Known limitations
 

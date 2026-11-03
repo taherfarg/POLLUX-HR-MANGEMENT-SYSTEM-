@@ -466,6 +466,12 @@ export async function fetchMessages(id, query = {}) {
 export const sendChatMessage = async (id, body) => (await api.post(`/chat/conversations/${id}/messages`, { body })).data
 export const deleteChatMessage = async (id, messageId) => (await api.delete(`/chat/conversations/${id}/messages/${messageId}`)).data
 
+// --- Assistant ----------------------------------------------------------------
+
+export const fetchAssistantStatus = async () => (await api.get('/assistant/status')).data
+/** messages: [{ role: 'user' | 'assistant', text }], ending with the question. */
+export const askAssistant = async (messages) => (await api.post('/assistant/ask', { messages })).data
+
 // --- Dashboard, notifications and audit -----------------------------------
 
 export async function fetchDashboard() {

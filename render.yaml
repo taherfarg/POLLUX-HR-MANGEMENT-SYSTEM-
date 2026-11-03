@@ -60,10 +60,13 @@ services:
         value: info
       - key: SEED_DEMO_PASSWORD
         sync: false
-      # Optional Google AI Studio key for AI-drafted letters.
-      # Leave unset and letters use the deterministic templates.
+      # Optional Google AI Studio key: switches on the HR assistant and
+      # AI-drafted letters. Leave unset and the assistant stays off and
+      # letters use the deterministic templates.
       - key: GOOGLE_API_KEY
         sync: false
+      - key: GOOGLE_AI_MODEL
+        value: gemini-2.5-flash
 
   - type: web
     name: pollux-hr-web

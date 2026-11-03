@@ -38,6 +38,15 @@ const envSchema = z.object({
     .optional()
     .transform((value) => (value ? value : undefined)),
 
+  /**
+   * The Gemini model behind letters and the HR assistant. Google retires model
+   * names over time; when that happens this is the one value to change.
+   */
+  GOOGLE_AI_MODEL: z.string().trim().min(1).default('gemini-2.5-flash'),
+
+  /** Questions each person may ask the assistant per hour - a ceiling on cost. */
+  AI_ASSISTANT_HOURLY_LIMIT: z.coerce.number().int().positive().default(60),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_API_MAX: z.coerce.number().int().positive().default(300),

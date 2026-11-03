@@ -1,18 +1,4 @@
-import {
-  AlarmClock,
-  CalendarClock,
-  CheckCircle2,
-  ClipboardCheck,
-  Clock,
-  FileWarning,
-  HandCoins,
-  History,
-  Laptop,
-  Palmtree,
-  UserX,
-  UsersRound,
-  Wallet,
-} from 'lucide-react'
+import { AlarmClock, CalendarClock, CheckCircle2, ClipboardCheck, Clock, FileWarning, HandCoins, History, Laptop, Palmtree, Sparkles, UserX, UsersRound, Wallet } from 'lucide-react'
 import { Async, EmptyMini, Money, PageHero, Panel, StatCard, StatusPill } from '../components/ui.jsx'
 import { AttendanceStatus } from '../components/attendance.jsx'
 import { useResource } from '../hooks/useResource.js'
@@ -30,7 +16,16 @@ export default function DashboardPage({ session, navigate }) {
 
   return (
     <div className="page">
-      <PageHero name={session.employee?.firstName}>Today at Pollux Motors, and what needs your attention.</PageHero>
+      <PageHero
+        name={session.employee?.firstName}
+        actions={
+          <button className="button button-secondary" onClick={() => navigate('assistant', 'brief')}>
+            <Sparkles size={16} /> Daily brief
+          </button>
+        }
+      >
+        Today at Pollux Motors, and what needs your attention.
+      </PageHero>
       <Async loading={dashboard.loading} error={dashboard.error} onRetry={dashboard.reload} rows={8}>
         {dashboard.data && <Dashboard data={dashboard.data} navigate={navigate} />}
       </Async>

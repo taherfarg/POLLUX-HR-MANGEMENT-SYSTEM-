@@ -71,8 +71,11 @@ test.describe('Leave requests', () => {
     const window = leaveWindow(2)
 
     await signIn(page, ACCOUNTS.employee)
-    const before = await myBalance(page, 'ANNUAL', window.year)
-    const { reference } = await requestLeave(page, { ...window, reason: 'Long weekend' })
+    const { reference, days } = await requestLeave(page, { ...window, reason: 'Long weekend' })
+    // Measured once the request holds its days: in a year with no balance yet,
+    // submitting is what creates it.
+    const held = await myBalance(page, 'ANNUAL', window.year)
+    expect(held.pending).toBeGreaterThanOrEqual(days)
     await signOut(page)
 
     await signIn(page, ACCOUNTS.manager)
@@ -87,8 +90,8 @@ test.describe('Leave requests', () => {
 
     await signIn(page, ACCOUNTS.employee)
     const after = await myBalance(page, 'ANNUAL', window.year)
-    expect(after.pending).toBe(before.pending)
-    expect(after.available).toBe(before.available)
+    expect(after.pending).toBe(held.pending - days)
+    expect(after.available).toBe(held.available + days)
     await gotoPage(page, 'My requests')
     await page.locator('tr', { hasText: reference }).click()
     await expect(page.getByRole('dialog')).toContainText('Quarter-end: the showroom needs full cover that week.')
