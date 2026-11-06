@@ -10,7 +10,7 @@ export const THEME_KEY = 'pollux.theme'
 export const THEME_CHOICES = ['system', 'light', 'dark']
 
 const DARK_QUERY = '(prefers-color-scheme: dark)'
-const THEME_COLOURS = { light: '#f4f5f7', dark: '#0b0d11' }
+const THEME_COLOURS = { light: '#f2f2f7', dark: '#08080b' }
 
 /** The stored choice, or 'system' when there is none (or storage is blocked). */
 export function readThemePreference(storage = globalThis.localStorage) {

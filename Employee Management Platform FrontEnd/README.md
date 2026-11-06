@@ -89,8 +89,12 @@ src/
   `index.html` applies the choice before the first paint.
 - **Search**: Ctrl+K (⌘K on a Mac) or the search box opens any page in the person's
   navigation and, for HR, any employee by name, number or email.
-- **Fonts** (Inter, JetBrains Mono) are bundled from `@fontsource-variable`, so the app
-  makes no third-party font requests and the browser loads only the alphabets a page uses.
+- **Look**: Apple-inspired glass. Every colour, fill, hairline and material is a token in
+  `styles.css` (light, then dark); panels use the `--glass` material, and the shell, dialogs,
+  popovers and toasts add a backdrop blur. "Reduce transparency" on the device, or a browser
+  without `backdrop-filter`, gets solid surfaces with the same layout.
+- **Fonts**: SF Pro on Apple devices (the system font); elsewhere Inter and JetBrains Mono,
+  bundled from `@fontsource-variable`, so the app makes no third-party font requests.
 - **Dialogs stack** (an approval over a detail view) with unique accessible names;
   Escape closes the top one.
 

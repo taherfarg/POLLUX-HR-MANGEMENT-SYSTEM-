@@ -33,7 +33,7 @@ each judged against their own schedule, timezone and holiday calendar.
 | **Chat** | One-to-one and group conversations between colleagues: unread counts in the navigation and on the phone tab bar, day separators, unsending your own message, adding people to a group, renaming and leaving it; new messages arrive without a reload. A conversation is readable by its members only — HR and administrators included |
 | **Reports** | Attendance, late arrivals, absence, overtime, leave, leave balance, payroll, salary advances, employees — preview on screen, export as CSV, Excel or PDF, every export audited |
 | **Administration** | Users & roles, audit logs with before/after, company settings — every policy number lives in the database, not in code |
-| **Experience** | Light and dark appearance (the device's, or chosen per browser); **Ctrl/⌘ K** search that opens any page and, for HR, any person; a tab bar on phones for the pages each role uses most; tables that become cards on small screens; the Inter typeface served with the app, no third-party font requests |
+| **Experience** | An Apple-inspired design: translucent "glass" panels over a soft colour wash, a floating sidebar, top bar and phone tab bar, capsule buttons, frosted dialogs and Apple's system colours; SF Pro on Apple devices and Inter (served with the app) elsewhere. Light and dark appearance (the device's, or chosen per browser), and solid surfaces for anyone who asks their device for less transparency; **Ctrl/⌘ K** search that opens any page and, for HR, any person; tables that become cards on small screens |
 
 <table>
 <tr>
