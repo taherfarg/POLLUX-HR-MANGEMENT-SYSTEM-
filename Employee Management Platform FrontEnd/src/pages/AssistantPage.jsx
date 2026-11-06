@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUp, Copy, Database, Mic, MicOff, RotateCcw, Sparkles, SquarePen } from 'lucide-react'
+import { ArrowUp, Copy, Database, Mic, MicOff, RotateCcw, Sparkles, SquarePen } from '../icons.js'
 import { ErrorState, LoadingState, PageHeader } from '../components/ui.jsx'
 import Markdown from '../components/Markdown.jsx'
 import AssistantAction from '../components/AssistantAction.jsx'

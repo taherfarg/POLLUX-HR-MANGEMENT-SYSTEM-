@@ -14,7 +14,7 @@ the audit that preceded it are in [POLLUX-HR-MIGRATION-PLAN.md](POLLUX-HR-MIGRAT
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19 + Vite, plain JSX, lucide icons, no UI framework |
+| Frontend | React 19 + Vite, plain JSX, Phosphor icons (`src/icons.js`), no UI framework |
 | API | Express 4 + TypeScript (strict), Zod validation, pino logging |
 | Database | PostgreSQL + Prisma 6 (migrations) |
 | Auth | Backend-issued JWT access tokens + rotating, hashed refresh tokens; lockout; rate limits |

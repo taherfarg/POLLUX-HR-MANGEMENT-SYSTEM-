@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check } from '../icons.js'
 import { FormError, FormField, Spinner } from './ui.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useResource } from '../hooks/useResource.js'

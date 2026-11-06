@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, BriefcaseBusiness, Clock, Download, ExternalLink, FileText, Globe2, LockKeyhole, MapPin, Pencil, Plus, ReceiptText, UserRoundPen } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, Clock, Download, ExternalLink, FileText, Globe2, LockKeyhole, MapPin, Pencil, Plus, ReceiptText, UserRoundPen } from '../icons.js'
 import {
   Async,
   Avatar,

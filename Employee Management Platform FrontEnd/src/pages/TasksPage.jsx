@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlarmClock, CheckCircle2, CircleDot, ListTodo, MessageSquare, Plus, Timer } from 'lucide-react'
+import { AlarmClock, CheckCircle2, CircleDot, ListTodo, MessageSquare, Plus, Timer } from '../icons.js'
 import { Async, Avatar, DataTable, EmptyState, FilterSelect, Modal, PageHeader, Pagination, Panel, SearchInput, SegmentedTabs, StatCard } from '../components/ui.jsx'
 import { DueDate, PriorityFlag, TaskCheck, TaskDetail, TaskForm, TaskStatus } from '../components/tasks.jsx'
 import { useDebouncedValue, useResource } from '../hooks/useResource.js'

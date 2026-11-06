@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarClock, Pencil, Plus, UserCheck } from 'lucide-react'
+import { CalendarClock, Pencil, Plus, UserCheck } from '../icons.js'
 import { Async, Chip, DataTable, EmptyState, FormError, FormField, Modal, PageHeader, Panel, SearchInput, Spinner, StatusPill, useSubmit } from '../components/ui.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useResource } from '../hooks/useResource.js'

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, CalendarDays, FileText, Info, Plane, UserRound } from 'lucide-react'
+import { ArrowUpRight, CalendarDays, FileText, Info, Plane, UserRound } from '../icons.js'
 import { FormError, FormField, Modal, Spinner } from './ui.jsx'
 import { EmployeePicker } from './EmployeePicker.jsx'
 import { useResource } from '../hooks/useResource.js'

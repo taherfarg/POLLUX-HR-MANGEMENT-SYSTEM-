@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ImageUp, LockKeyhole, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { ImageUp, LockKeyhole, Pencil, Plus, Save, Trash2 } from '../icons.js'
 import {
   Async,
   DataTable,

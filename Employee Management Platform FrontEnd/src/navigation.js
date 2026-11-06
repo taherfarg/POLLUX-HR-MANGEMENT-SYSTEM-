@@ -27,55 +27,56 @@ import {
   UserRound,
   UsersRound,
   Wallet,
-} from 'lucide-react'
+} from './icons.js'
 
 /**
  * Every page, its title and who it is offered to. Navigation is a convenience:
  * the API enforces every rule again, so a page reached by URL without the
- * right role simply shows the API's refusal.
+ * right role simply shows the API's refusal. `tint` colours the page's icon
+ * tile, so a page keeps one colour in the sidebar, the phone's menu and search.
  */
 export const PAGES = {
-  dashboard: { title: 'Dashboard', description: 'Today at Pollux Motors, and what needs your attention.', icon: Gauge },
-  home: { title: 'Home', description: 'Your day, your time off and your pay at a glance.', icon: Home },
-  tasks: { title: 'Tasks', description: 'Work given to you, by you and to your team.', icon: ListTodo },
-  chat: { title: 'Chat', description: 'Messages with colleagues, one to one or in groups.', icon: MessagesSquare },
-  assistant: { title: 'Assistant', description: 'Ask about attendance, leave, approvals and tasks in your own words.', icon: Sparkles },
+  dashboard: { title: 'Dashboard', description: 'Today at Pollux Motors, and what needs your attention.', icon: Gauge, tint: 'blue' },
+  home: { title: 'Home', description: 'Your day, your time off and your pay at a glance.', icon: Home, tint: 'blue' },
+  tasks: { title: 'Tasks', description: 'Work given to you, by you and to your team.', icon: ListTodo, tint: 'orange' },
+  chat: { title: 'Chat', description: 'Messages with colleagues, one to one or in groups.', icon: MessagesSquare, tint: 'green' },
+  assistant: { title: 'Assistant', description: 'Ask about attendance, leave, approvals and tasks in your own words.', icon: Sparkles, tint: 'purple' },
 
-  employees: { title: 'Employees', description: 'Everyone at Pollux Motors - office, field and remote.', icon: UsersRound },
-  departments: { title: 'Departments', description: 'Teams and who leads them.', icon: Building2 },
-  'work-locations': { title: 'Work locations', description: 'Where people work: the Dubai office, the field, remote.', icon: MapPin },
+  employees: { title: 'Employees', description: 'Everyone at Pollux Motors - office, field and remote.', icon: UsersRound, tint: 'blue' },
+  departments: { title: 'Departments', description: 'Teams and who leads them.', icon: Building2, tint: 'indigo' },
+  'work-locations': { title: 'Work locations', description: 'Where people work: the Dubai office, the field, remote.', icon: MapPin, tint: 'red' },
 
-  attendance: { title: 'Attendance', description: 'Check-ins, lateness and absences, evaluated against each schedule.', icon: Clock },
-  timesheets: { title: 'Timesheets', description: 'Worked hours, lateness and overtime per person and period.', icon: CalendarRange },
-  'work-schedules': { title: 'Work schedules', description: 'Working days, hours and breaks - and who follows which.', icon: CalendarClock },
-  overtime: { title: 'Overtime', description: 'Overtime from attendance and manual entries, and their approval.', icon: Timer },
+  attendance: { title: 'Attendance', description: 'Check-ins, lateness and absences, evaluated against each schedule.', icon: Clock, tint: 'teal' },
+  timesheets: { title: 'Timesheets', description: 'Worked hours, lateness and overtime per person and period.', icon: CalendarRange, tint: 'cyan' },
+  'work-schedules': { title: 'Work schedules', description: 'Working days, hours and breaks - and who follows which.', icon: CalendarClock, tint: 'indigo' },
+  overtime: { title: 'Overtime', description: 'Overtime from attendance and manual entries, and their approval.', icon: Timer, tint: 'orange' },
 
-  requests: { title: 'Requests', description: 'Leave, document and profile requests waiting for a decision.', icon: ClipboardCheck },
-  'leave-balances': { title: 'Leave balances', description: 'Entitlement, carried over, used, pending and available days.', icon: Scale },
-  holidays: { title: 'Holidays', description: 'Holiday calendars: UAE by default, others where assigned.', icon: Palmtree },
+  requests: { title: 'Requests', description: 'Leave, document and profile requests waiting for a decision.', icon: ClipboardCheck, tint: 'yellow' },
+  'leave-balances': { title: 'Leave balances', description: 'Entitlement, carried over, used, pending and available days.', icon: Scale, tint: 'purple' },
+  holidays: { title: 'Holidays', description: 'Holiday calendars: UAE by default, others where assigned.', icon: Palmtree, tint: 'green' },
 
-  payroll: { title: 'Payroll runs', description: 'Calculate, review, approve and pay each month.', icon: Wallet },
-  advances: { title: 'Salary advances', description: 'Advance requests, approvals and repayment through payroll.', icon: HandCoins },
-  adjustments: { title: 'Bonuses & deductions', description: 'One-off earnings and deductions, each approved before payroll.', icon: Coins },
-  payslips: { title: 'Payslips', description: 'Payslips from approved payrolls, as stored PDFs.', icon: ReceiptText },
+  payroll: { title: 'Payroll runs', description: 'Calculate, review, approve and pay each month.', icon: Wallet, tint: 'green' },
+  advances: { title: 'Salary advances', description: 'Advance requests, approvals and repayment through payroll.', icon: HandCoins, tint: 'teal' },
+  adjustments: { title: 'Bonuses & deductions', description: 'One-off earnings and deductions, each approved before payroll.', icon: Coins, tint: 'yellow' },
+  payslips: { title: 'Payslips', description: 'Payslips from approved payrolls, as stored PDFs.', icon: ReceiptText, tint: 'cyan' },
 
-  documents: { title: 'Documents', description: 'Contracts, visas, certificates and payslips.', icon: FileText },
-  reports: { title: 'Reports', description: 'Attendance, leave, payroll and people reports with CSV, Excel and PDF export.', icon: BarChart3 },
+  documents: { title: 'Documents', description: 'Contracts, visas, certificates and payslips.', icon: FileText, tint: 'blue' },
+  reports: { title: 'Reports', description: 'Attendance, leave, payroll and people reports with CSV, Excel and PDF export.', icon: BarChart3, tint: 'purple' },
 
-  users: { title: 'Users & roles', description: 'Logins, roles and access.', icon: ShieldCheck },
-  'audit-logs': { title: 'Audit logs', description: 'Every sensitive action, who did it and when. Read-only.', icon: History },
-  settings: { title: 'Company settings', description: 'Company details and the policies every calculation uses.', icon: Settings },
+  users: { title: 'Users & roles', description: 'Logins, roles and access.', icon: ShieldCheck, tint: 'gray' },
+  'audit-logs': { title: 'Audit logs', description: 'Every sensitive action, who did it and when. Read-only.', icon: History, tint: 'gray' },
+  settings: { title: 'Company settings', description: 'Company details and the policies every calculation uses.', icon: Settings, tint: 'gray' },
 
-  'my-attendance': { title: 'My attendance', description: 'Check in and out, and your attendance history.', icon: Clock },
-  'my-requests': { title: 'My requests', description: 'Leave, documents and profile updates.', icon: CalendarDays },
-  'my-pay': { title: 'My pay', description: 'Payslips and salary advances.', icon: Wallet },
-  'my-documents': { title: 'My documents', description: 'Your contracts, certificates and payslips.', icon: FileText },
-  'my-profile': { title: 'My profile', description: 'Your personal and employment details.', icon: UserRound },
-  'my-team': { title: 'My team', description: 'Your direct reports, their attendance and requests.', icon: Layers },
-  'check-in': { title: 'Check in', description: 'Check in or out with the office QR code.', icon: QrCode },
+  'my-attendance': { title: 'My attendance', description: 'Check in and out, and your attendance history.', icon: Clock, tint: 'teal' },
+  'my-requests': { title: 'My requests', description: 'Leave, documents and profile updates.', icon: CalendarDays, tint: 'red' },
+  'my-pay': { title: 'My pay', description: 'Payslips and salary advances.', icon: Wallet, tint: 'green' },
+  'my-documents': { title: 'My documents', description: 'Your contracts, certificates and payslips.', icon: FileText, tint: 'blue' },
+  'my-profile': { title: 'My profile', description: 'Your personal and employment details.', icon: UserRound, tint: 'gray' },
+  'my-team': { title: 'My team', description: 'Your direct reports, their attendance and requests.', icon: Layers, tint: 'indigo' },
+  'check-in': { title: 'Check in', description: 'Check in or out with the office QR code.', icon: QrCode, tint: 'gray' },
 }
 
-const item = (id, label) => ({ id, label: label ?? PAGES[id].title, icon: PAGES[id].icon })
+const item = (id, label) => ({ id, label: label ?? PAGES[id].title, icon: PAGES[id].icon, tint: PAGES[id].tint })
 
 /** Navigation groups for the session. */
 export function navigationFor(session) {

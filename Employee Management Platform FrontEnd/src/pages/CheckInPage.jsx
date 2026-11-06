@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle2, CircleAlert, LocateFixed, LogIn, LogOut, QrCode, Wifi } from 'lucide-react'
+import { CheckCircle2, CircleAlert, LocateFixed, LogIn, LogOut, QrCode, Wifi } from '../icons.js'
 import { ErrorState, LoadingState, Panel, Spinner } from '../components/ui.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { emitChange } from '../lib/events.js'

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Copy, Languages, Sparkles } from 'lucide-react'
+import { Check, Copy, Languages, Sparkles } from '../icons.js'
 import { ErrorState, LoadingState, Modal } from './ui.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { formatDate } from '../lib/format.js'

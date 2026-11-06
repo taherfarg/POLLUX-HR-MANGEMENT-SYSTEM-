@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarPlus, ClipboardCheck, FileText, UserRoundPen } from 'lucide-react'
+import { CalendarPlus, ClipboardCheck, FileText, UserRoundPen } from '../icons.js'
 import { Async, DataTable, EmptyState, PageHeader, Panel, SegmentedTabs, StatusPill } from '../components/ui.jsx'
 import { BalanceCards } from '../components/leave.jsx'
 import RequestDetail from '../components/RequestDetail.jsx'

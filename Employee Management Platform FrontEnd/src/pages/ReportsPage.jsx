@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, FileDown, FileSpreadsheet, FileText, LockKeyhole, Play } from 'lucide-react'
+import { BarChart3, FileDown, FileSpreadsheet, FileText, LockKeyhole, Play } from '../icons.js'
 import { Async, DataTable, EmptyState, FilterSelect, PageHeader, Panel, Spinner } from '../components/ui.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useResource } from '../hooks/useResource.js'

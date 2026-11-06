@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Pencil, Plus } from 'lucide-react'
+import { Building2, Pencil, Plus } from '../icons.js'
 import { Async, DataTable, EmptyState, FormError, FormField, Modal, PageHeader, Panel, Spinner, useSubmit } from '../components/ui.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useResource } from '../hooks/useResource.js'

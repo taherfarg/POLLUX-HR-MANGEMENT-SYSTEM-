@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ClipboardCheck, Plus } from 'lucide-react'
+import { ClipboardCheck, Plus } from '../icons.js'
 import { Async, Avatar, DataTable, EmptyState, FilterSelect, PageHeader, Pagination, Panel, SearchInput, SegmentedTabs, StatusPill } from '../components/ui.jsx'
 import RequestDetail from '../components/RequestDetail.jsx'
 import { RecordLeaveModal } from '../components/RequestFormModal.jsx'

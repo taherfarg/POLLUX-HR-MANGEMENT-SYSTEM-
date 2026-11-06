@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, Ban, CalendarDays, Check, CheckCircle2, Flag, MessageSquare, Pencil, RotateCcw, Send, Trash2, UserRound } from 'lucide-react'
+import { ArrowRight, Ban, CalendarDays, Check, CheckCircle2, Flag, MessageSquare, Pencil, RotateCcw, Send, Trash2, UserRound } from '../icons.js'
 import { Async, Avatar, ConfirmDialog, EmptyMini, ErrorState, FormError, FormField, LoadingState, Modal, Panel, RequestFact, Spinner, StatusPill, useSubmit } from './ui.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { chatPerson } from '../lib/chat.js'
@@ -47,7 +47,7 @@ export function TaskCheck({ task, onToggle, busy }) {
         onToggle(task)
       }}
     >
-      <Check size={13} strokeWidth={3} aria-hidden="true" />
+      <Check size={13} weight="bold" aria-hidden="true" />
     </button>
   )
 }

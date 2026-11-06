@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, KeyRound, Lock, Plus, ShieldCheck, Unlock, UserCog } from 'lucide-react'
+import { Copy, KeyRound, Lock, Plus, ShieldCheck, Unlock, UserCog } from '../icons.js'
 import {
   Async,
   ConfirmDialog,

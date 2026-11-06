@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, UsersRound } from 'lucide-react'
+import { Plus, UsersRound } from '../icons.js'
 import {
   Async,
   Avatar,

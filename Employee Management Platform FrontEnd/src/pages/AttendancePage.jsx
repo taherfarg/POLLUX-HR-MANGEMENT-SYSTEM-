@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlarmClock, CheckCircle2, Clock, Laptop, Palmtree, Pencil, Plus, QrCode, RefreshCcw, UserX } from 'lucide-react'
+import { AlarmClock, CheckCircle2, Clock, Laptop, Palmtree, Pencil, Plus, QrCode, RefreshCcw, UserX } from '../icons.js'
 import {
   Async,
   DataTable,

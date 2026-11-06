@@ -1,4 +1,4 @@
-import { Palmtree } from 'lucide-react'
+import { Palmtree } from '../icons.js'
 import { EmptyMini } from './ui.jsx'
 import { formatDays } from '../lib/format.js'
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Plus, Timer, X } from 'lucide-react'
+import { Check, Plus, Timer, X } from '../icons.js'
 import {
   Async,
   ConfirmDialog,

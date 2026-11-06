@@ -1,4 +1,4 @@
-import { UsersRound } from 'lucide-react'
+import { UsersRound } from '../icons.js'
 import { Async, Avatar, Chip, DataTable, EmptyState, PageHeader, Panel } from '../components/ui.jsx'
 import { AttendanceStatus } from '../components/attendance.jsx'
 import EmployeeProfile from '../components/EmployeeProfile.jsx'

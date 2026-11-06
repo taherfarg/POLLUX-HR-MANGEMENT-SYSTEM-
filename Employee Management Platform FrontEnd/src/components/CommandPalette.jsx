@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Search, Sparkles } from 'lucide-react'
-import { Avatar } from './ui.jsx'
+import { Search, Sparkles } from '../icons.js'
+import { Avatar, PageTile } from './ui.jsx'
 import { allowedPages, navigationFor } from '../navigation.js'
 import { fetchEmployees } from '../api/endpoints.js'
 
@@ -25,7 +25,7 @@ function Palette({ onClose, session, onNavigate }) {
   const pages = useMemo(
     () =>
       navigationFor(session).flatMap((group) =>
-        group.items.map((entry) => ({ key: `page:${entry.id}`, kind: 'page', id: entry.id, label: entry.label, hint: group.label ?? '', icon: entry.icon })),
+        group.items.map((entry) => ({ key: `page:${entry.id}`, kind: 'page', id: entry.id, label: entry.label, hint: group.label ?? '', icon: entry.icon, tint: entry.tint })),
       ),
     [session],
   )
@@ -54,7 +54,7 @@ function Palette({ onClose, session, onNavigate }) {
   // Anything longer than a word can go to the assistant as a question.
   const askResults =
     query.trim().length >= 3 && allowedPages(session).has('assistant')
-      ? [{ key: 'ask', kind: 'ask', label: `Ask: “${query.trim()}”`, icon: Sparkles }]
+      ? [{ key: 'ask', kind: 'ask', label: `Ask: “${query.trim()}”`, icon: Sparkles, tint: 'purple' }]
       : []
   const results = [...pageResults, ...personResults, ...askResults]
   const current = Math.min(active, Math.max(results.length - 1, 0))
@@ -134,7 +134,7 @@ function Palette({ onClose, session, onNavigate }) {
                     onMouseMove={() => index !== current && setActive(index)}
                     onClick={() => choose(result)}
                   >
-                    {result.kind === 'person' ? <Avatar employee={result.person} size="xs" /> : <Icon size={18} aria-hidden="true" />}
+                    {result.kind === 'person' ? <Avatar employee={result.person} size="xs" /> : <PageTile icon={Icon} tint={result.tint} size="sm" />}
                     <span>
                       <strong>{result.label}</strong>
                       {result.kind === 'person' && <small>{result.hint}</small>}

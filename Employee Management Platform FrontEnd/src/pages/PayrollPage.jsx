@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, BadgeCheck, Banknote, Calculator, CheckCircle2, Lock, Plus, ReceiptText, RotateCcw, ShieldCheck, Wallet, X } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, Banknote, Calculator, CheckCircle2, Lock, Plus, ReceiptText, RotateCcw, ShieldCheck, Wallet, X } from '../icons.js'
 import {
   Async,
   ConfirmDialog,

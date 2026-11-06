@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Palmtree, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Palmtree, Pencil, Plus, Trash2 } from '../icons.js'
 import {
   Async,
   Chip,

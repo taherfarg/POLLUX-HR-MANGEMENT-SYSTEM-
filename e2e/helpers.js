@@ -19,7 +19,9 @@ export async function signIn(page, email, password = DEMO_PASSWORD) {
   await page.getByRole('textbox', { name: 'Work email' }).fill(email)
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeAttached()
+  // The breadcrumb shows on every size; on a phone the full navigation stays
+  // out of the accessibility tree until "More" opens it.
+  await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
 }
 
 export async function signOut(page) {
@@ -28,12 +30,22 @@ export async function signOut(page) {
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
 }
 
-/** On a phone the sidebar is behind a menu button; on desktop it is always open. */
+/**
+ * On a phone the navigation is a sheet behind the tab bar's "More"; on a
+ * tablet it is a drawer behind the menu button; on desktop it is always open.
+ */
 export async function openNavIfCollapsed(page) {
-  const burger = page.getByRole('button', { name: 'Open navigation' })
+  const nav = page.getByRole('navigation', { name: 'Primary navigation' })
+  const more = page.getByRole('button', { name: 'More pages', exact: true })
+  if (await more.isVisible().catch(() => false)) {
+    if ((await more.getAttribute('aria-expanded')) !== 'true') await more.click()
+    await expect(nav).toBeInViewport()
+    return
+  }
+  const burger = page.getByRole('button', { name: 'Open navigation', exact: true })
   if (await burger.isVisible().catch(() => false)) {
     await burger.click()
-    await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible()
+    await expect(nav).toBeInViewport()
   }
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, Ban, CalendarDays, Check, CheckCircle2, Clock3, FileText, Globe2, Plane, UserRound, X } from 'lucide-react'
+import { ArrowRight, Ban, CalendarDays, Check, CheckCircle2, Clock3, FileText, Globe2, Plane, UserRound, X } from '../icons.js'
 import { Avatar, ErrorState, FormError, LoadingState, Modal, RequestFact, Spinner, StatusPill } from './ui.jsx'
 import LetterModal from './LetterModal.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'

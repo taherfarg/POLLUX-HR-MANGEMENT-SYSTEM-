@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlarmClock, CalendarPlus, CheckCircle2, ClipboardCheck, FileText, HandCoins, Palmtree, ReceiptText, Sparkles, UserX, UsersRound } from 'lucide-react'
+import { AlarmClock, CalendarPlus, CheckCircle2, ClipboardCheck, FileText, HandCoins, Palmtree, ReceiptText, Sparkles, UserX, UsersRound } from '../icons.js'
 import { Async, EmptyMini, Money, PageHero, Panel, StatCard, StatusPill } from '../components/ui.jsx'
 import { AttendanceStatus, CheckInCard } from '../components/attendance.jsx'
 import { BalanceCards } from '../components/leave.jsx'

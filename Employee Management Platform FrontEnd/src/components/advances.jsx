@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Banknote, CalendarClock, Check, X } from 'lucide-react'
+import { Banknote, CalendarClock, Check, X } from '../icons.js'
 import { Async, ConfirmDialog, DataTable, FormError, FormField, Modal, Money, RequestFact, Spinner, StatusPill, useSubmit } from './ui.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { currentMonthKey, formatDate, formatMonth, shiftMonthKey } from '../lib/format.js'

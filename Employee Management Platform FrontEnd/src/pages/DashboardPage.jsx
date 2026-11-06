@@ -1,4 +1,4 @@
-import { AlarmClock, CalendarClock, CheckCircle2, ClipboardCheck, Clock, FileWarning, HandCoins, History, Laptop, Palmtree, Sparkles, UserX, UsersRound, Wallet } from 'lucide-react'
+import { AlarmClock, CalendarClock, CheckCircle2, ClipboardCheck, Clock, FileWarning, HandCoins, History, Laptop, Palmtree, Sparkles, UserX, UsersRound, Wallet } from '../icons.js'
 import { Async, EmptyMini, Money, PageHero, Panel, StatCard, StatusPill } from '../components/ui.jsx'
 import { AttendanceStatus } from '../components/attendance.jsx'
 import { useResource } from '../hooks/useResource.js'

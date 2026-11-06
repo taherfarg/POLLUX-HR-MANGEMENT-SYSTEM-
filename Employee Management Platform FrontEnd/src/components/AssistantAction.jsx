@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, ClipboardCheck, ListTodo, X } from 'lucide-react'
+import { CheckCircle2, ClipboardCheck, ListTodo, X } from '../icons.js'
 import { FormError, Spinner } from './ui.jsx'
 import { emitChange } from '../lib/events.js'
 import { approveRequest, createTask, rejectRequest } from '../api/endpoints.js'

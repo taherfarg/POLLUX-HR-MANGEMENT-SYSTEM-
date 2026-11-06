@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, LogOut, MessagesSquare, Send, Trash2, UserPlus, UsersRound } from 'lucide-react'
+import { ArrowLeft, Check, LogOut, MessagesSquare, Send, Trash2, UserPlus, UsersRound } from '../icons.js'
 import { Avatar, ConfirmDialog, EmptyState, ErrorState, FormError, FormField, LoadingState, Modal, SearchInput, SegmentedTabs, Spinner, useSubmit } from './ui.jsx'
 import { useDebouncedValue, useResource } from '../hooks/useResource.js'
 import { usePolling } from '../hooks/usePolling.js'
@@ -60,7 +60,7 @@ function PeoplePicker({ selected, onChange, exclude = [] }) {
                 <small>{[person.jobTitle, person.department].filter(Boolean).join(' · ') || 'Pollux Motors'}</small>
               </span>
               <i className="pick-mark" aria-hidden="true">
-                <Check size={13} strokeWidth={3} />
+                <Check size={13} weight="bold" />
               </i>
             </label>
           </li>

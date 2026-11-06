@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HandCoins, Plus, ReceiptText } from 'lucide-react'
+import { HandCoins, Plus, ReceiptText } from '../icons.js'
 import { Async, DataTable, Detail, EmptyMini, EmptyState, Modal, Money, PageHeader, Panel, StatusPill, Tabs } from '../components/ui.jsx'
 import { AdvanceDetail, AdvanceRequestForm } from '../components/advances.jsx'
 import { PayslipModal } from './PayslipsPage.jsx'

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { History, ShieldCheck } from 'lucide-react'
+import { History, ShieldCheck } from '../icons.js'
 import {
   Async,
   DataTable,

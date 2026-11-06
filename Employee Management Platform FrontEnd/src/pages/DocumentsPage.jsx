@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Download, ExternalLink, FileText, Plus } from 'lucide-react'
+import { Download, ExternalLink, FileText, Plus } from '../icons.js'
 import {
   Async,
   DataTable,

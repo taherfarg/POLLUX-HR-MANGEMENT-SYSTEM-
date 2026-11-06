@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, LockKeyhole, RotateCcw, Search, X, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, LockKeyhole, RotateCcw, Search, X, XCircle } from '../icons.js'
 import { formatAmount, formatDate, greeting } from '../lib/format.js'
 import brandMarkUrl from '../assets/brand/pollux-motors-mark.png'
 import logoForLightUrl from '../assets/brand/pollux-motors-logo-dark.webp'
@@ -8,6 +8,18 @@ import logoForDarkUrl from '../assets/brand/pollux-motors-logo-light.webp'
 /** Shared presentational primitives used across every page. */
 
 /** The Pollux Motors monogram, white on night navy - also the browser tab icon. */
+/**
+ * A page's icon on its coloured tile - the same tile in the sidebar, the
+ * phone's menu and search, so each page is recognisable by colour.
+ */
+export function PageTile({ icon: Icon, tint = 'gray', size = 'md' }) {
+  return (
+    <span className={`page-tile page-tile-${size}`} data-tint={tint} aria-hidden="true">
+      <Icon weight="fill" />
+    </span>
+  )
+}
+
 export function BrandMark({ size = 'md' }) {
   return <img className={`brand-mark ${size === 'lg' ? 'brand-mark-lg' : ''}`} src={brandMarkUrl} alt="" aria-hidden="true" />
 }

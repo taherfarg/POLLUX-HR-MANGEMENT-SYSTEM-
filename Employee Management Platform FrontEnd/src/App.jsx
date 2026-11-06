@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell, CheckCircle2, ChevronRight, KeyRound, LogOut, Menu, Monitor, Moon, MoreHorizontal, Search, Sun, X } from 'lucide-react'
-import { Avatar, BrandLogo, BrandMark, FormError, FormField, LoadingState, Modal, Spinner, Toast } from './components/ui.jsx'
+import { Bell, CheckCircle2, ChevronRight, KeyRound, LogOut, Menu, Monitor, Moon, Search, SquaresFour, Sun, X } from './icons.js'
+import { Avatar, BrandLogo, BrandMark, FormError, FormField, LoadingState, Modal, PageTile, Spinner, Toast } from './components/ui.jsx'
 import { ClockButton } from './components/attendance.jsx'
 import CommandPalette from './components/CommandPalette.jsx'
 import { useAuth } from './hooks/useAuth.jsx'
@@ -213,7 +213,7 @@ function Workspace({ session }) {
       <div className="workspace">
         <header className="topbar">
           <button className="mobile-menu" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
-            <Menu size={20} />
+            <Menu size={20} weight="bold" />
           </button>
           {/* Pages carry their own heading and description; the sticky bar
               keeps the reader oriented once that heading has scrolled away. */}
@@ -268,7 +268,7 @@ function Workspace({ session }) {
         </main>
       </div>
 
-      <BottomNav session={session} page={page} onNavigate={navigate} onMore={() => setMobileNavOpen(true)} unreadMessages={unreadMessages} />
+      <BottomNav session={session} page={page} onNavigate={navigate} onMore={() => setMobileNavOpen(true)} moreOpen={mobileNavOpen} unreadMessages={unreadMessages} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} session={session} onNavigate={navigate} />
       <Toast toast={toast} onClose={() => setToast(null)} />
       <ChangePasswordModal
@@ -311,17 +311,25 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
   const user = session.employee
   const logo = company?.company?.logoUrl
 
+  useEffect(() => {
+    if (!open) return undefined
+    const onKey = (event) => event.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   return (
     <>
       {open && <button className="nav-scrim" aria-label="Close navigation" onClick={onClose} />}
       <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
         <div className="sidebar-head">
+          <span className="sidebar-grabber" aria-hidden="true" />
           <span className="sidebar-brand">
             <BrandLogo />
             <span className="product-tag">HR</span>
           </span>
           <button className="sidebar-close" onClick={onClose} aria-label="Close navigation">
-            <X size={20} />
+            <X size={18} weight="bold" />
           </button>
         </div>
 
@@ -338,7 +346,6 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
             <div className="nav-group" key={group.label ?? `group-${index}`}>
               {group.label && <p className="nav-label">{group.label}</p>}
               {group.items.map((entry) => {
-                const Icon = entry.icon
                 return (
                   <button
                     className={page === entry.id ? 'active' : ''}
@@ -346,10 +353,11 @@ function Sidebar({ session, page, onNavigate, onLogout, onSecurity, open, onClos
                     key={entry.id}
                     aria-current={page === entry.id ? 'page' : undefined}
                   >
-                    <Icon size={18} />
+                    <PageTile icon={entry.icon} tint={entry.tint} />
                     <span>{entry.label}</span>
                     {entry.id === 'requests' && pendingCount > 0 && <b>{pendingCount}</b>}
                     {entry.id === 'chat' && unreadMessages > 0 && <b>{badgeCount(unreadMessages)}</b>}
+                    <ChevronRight className="nav-chevron" size={14} weight="bold" aria-hidden="true" />
                   </button>
                 )
               })}
@@ -409,22 +417,25 @@ function ThemeSwitch() {
 }
 
 /** On phones: the role's most used pages as a tab bar, the rest behind "More". */
-function BottomNav({ session, page, onNavigate, onMore, unreadMessages }) {
+function BottomNav({ session, page, onNavigate, onMore, moreOpen, unreadMessages }) {
   const items = quickNavFor(session)
+  // A page outside the tab bar is shown as "More", the way iOS marks it.
+  const inMore = !items.some((entry) => entry.id === page)
   return (
     <nav className="bottom-nav" aria-label="Quick navigation" style={{ '--items': items.length + 1 }}>
       {items.map((entry) => {
         const Icon = entry.icon
+        const current = page === entry.id
         return (
-          <button key={entry.id} type="button" onClick={() => onNavigate(entry.id)} aria-current={page === entry.id ? 'page' : undefined}>
-            <Icon size={21} aria-hidden="true" />
+          <button key={entry.id} type="button" onClick={() => onNavigate(entry.id)} aria-current={current ? 'page' : undefined}>
+            <Icon size={23} weight={current ? 'fill' : 'regular'} aria-hidden="true" />
             <span>{entry.label}</span>
             {entry.id === 'chat' && unreadMessages > 0 && <b className="bottom-nav-badge" aria-label={`${unreadMessages} unread`}>{badgeCount(unreadMessages)}</b>}
           </button>
         )
       })}
-      <button type="button" onClick={onMore} aria-label="More pages">
-        <MoreHorizontal size={21} aria-hidden="true" />
+      <button type="button" className={inMore ? 'more-current' : ''} onClick={onMore} aria-label="More pages" aria-expanded={moreOpen} aria-haspopup="dialog">
+        <SquaresFour size={23} weight={inMore || moreOpen ? 'fill' : 'regular'} aria-hidden="true" />
         <span>More</span>
       </button>
     </nav>

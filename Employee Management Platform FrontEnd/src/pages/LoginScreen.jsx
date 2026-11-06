@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarCheck2, Clock, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Wallet } from 'lucide-react'
+import { CalendarCheck2, Clock, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Wallet } from '../icons.js'
 import { BrandLogo, Spinner } from '../components/ui.jsx'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { fetchBranding } from '../api/endpoints.js'

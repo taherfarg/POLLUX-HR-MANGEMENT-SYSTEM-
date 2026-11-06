@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogIn, LogOut, QrCode } from 'lucide-react'
+import { LogIn, LogOut, QrCode } from '../icons.js'
 import { ErrorState, LoadingState, Spinner, StatusPill } from './ui.jsx'
 import { useResource } from '../hooks/useResource.js'
 import { emitChange, useChangeListener } from '../lib/events.js'

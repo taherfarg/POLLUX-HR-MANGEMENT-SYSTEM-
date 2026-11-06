@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarRange, FileSpreadsheet } from 'lucide-react'
+import { CalendarRange, FileSpreadsheet } from '../icons.js'
 import { Async, DataTable, EmptyState, FilterSelect, Modal, PageHeader, Panel } from '../components/ui.jsx'
 import { MonthCalendar } from '../components/attendance.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'

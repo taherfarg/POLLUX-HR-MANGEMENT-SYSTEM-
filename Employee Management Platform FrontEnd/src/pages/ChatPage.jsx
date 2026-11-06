@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MessageSquarePlus, MessagesSquare } from 'lucide-react'
+import { MessageSquarePlus, MessagesSquare } from '../icons.js'
 import { EmptyState, ErrorState, LoadingState, SearchInput } from '../components/ui.jsx'
 import { ChatThread, ConversationAvatar, NewChatModal } from '../components/chat.jsx'
 import { useResource } from '../hooks/useResource.js'

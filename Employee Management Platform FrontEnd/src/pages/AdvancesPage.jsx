@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HandCoins, Plus } from 'lucide-react'
+import { HandCoins, Plus } from '../icons.js'
 import { Async, DataTable, EmptyState, Modal, Money, PageHeader, Pagination, Panel, SearchInput, SegmentedTabs, StatusPill, humanize } from '../components/ui.jsx'
 import { AdvanceDetail, AdvanceRequestForm } from '../components/advances.jsx'
 import { EmployeePicker } from '../components/EmployeePicker.jsx'

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Clock } from 'lucide-react'
+import { Clock } from '../icons.js'
 import { Async, DataTable, EmptyState, Panel, StatCard } from '../components/ui.jsx'
 import { AttendanceStatus, CheckInCard, MonthCalendar } from '../components/attendance.jsx'
 import { useResource } from '../hooks/useResource.js'

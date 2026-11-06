@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import phosphorWeights from './phosphor-weights.js'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), phosphorWeights()],
   server: {
     port: 5173,
     /**
@@ -24,9 +25,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    // One bundle for the whole app is ~500 kB (~140 kB gzipped) - fine for an
+    // One bundle for the whole app is ~700 kB (~185 kB gzipped) - fine for an
     // HR tool used daily. Rarely used heavy parts (the QR code generator) load
     // on demand instead.
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 760,
   },
 })

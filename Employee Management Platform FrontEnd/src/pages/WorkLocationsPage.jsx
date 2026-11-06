@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Download, LocateFixed, MapPin, Pencil, Plus, Printer, QrCode, RefreshCw, Wifi } from 'lucide-react'
+import { Download, LocateFixed, MapPin, Pencil, Plus, Printer, QrCode, RefreshCw, Wifi } from '../icons.js'
 import { Async, Chip, DataTable, EmptyState, FormError, FormField, Modal, PageHeader, Panel, Spinner, StatusPill, useSubmit } from '../components/ui.jsx'
 import { useCompany } from '../hooks/useCompany.jsx'
 import { useResource } from '../hooks/useResource.js'

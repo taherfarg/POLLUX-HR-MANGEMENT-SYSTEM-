@@ -26,8 +26,14 @@ test.describe('Mobile layout', () => {
     const health = trackPageHealth(page)
     await signIn(page, ACCOUNTS.employee)
 
-    // The sidebar sits behind a labelled menu button at this width.
-    await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible()
+    // At this width every page is one tap away in the tab bar's "More" sheet.
+    await expect(page.getByRole('navigation', { name: 'Quick navigation' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open navigation' })).toBeHidden()
+    await page.getByRole('button', { name: 'More pages' }).click()
+    const menu = page.getByRole('navigation', { name: 'Primary navigation' })
+    await expect(menu).toBeInViewport()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
     await expect(page.getByRole('region', { name: "Today's attendance" })).toBeVisible()
     await expectNoHorizontalOverflow(page, 'employee home')
 

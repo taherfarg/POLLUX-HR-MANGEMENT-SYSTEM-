@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ReceiptText } from 'lucide-react'
+import { ReceiptText } from '../icons.js'
 import { Async, DataTable, EmptyState, FilterSelect, Modal, Money, PageHeader, Panel, SearchInput, StatusPill } from '../components/ui.jsx'
 import { PayslipView } from '../components/payroll.jsx'
 import { useResource } from '../hooks/useResource.js'

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarPlus, Pencil, Scale } from 'lucide-react'
+import { CalendarPlus, Pencil, Scale } from '../icons.js'
 import {
   Async,
   DataTable,
