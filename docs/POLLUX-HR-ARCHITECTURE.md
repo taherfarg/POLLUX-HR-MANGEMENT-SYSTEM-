@@ -65,7 +65,7 @@ Responses are `{ data }`, lists `{ data, meta, summary }`, errors
 | `audit`, `notifications` | read-only audit trail; in-app notifications |
 | `tasks` | tasks with priority, due date, status and comments; four lists (mine, created, team, all) |
 | `chat` | direct and group conversations, unread counts, polling for changes since a moment; members-only |
-| `assistant` | Gemini function calling over read-only tools that wrap the reports, the attendance board, the request inbox and tasks, run as the caller |
+| `assistant` | Gemini function calling over tools run as the caller: look-ups wrapping the reports, the attendance board, the request inbox and tasks; analysis (attention items, attendance by group and by day, profiles, holidays); and action tools that only prepare a task or decision for the person to confirm |
 
 ### Shared services (`src/services`)
 

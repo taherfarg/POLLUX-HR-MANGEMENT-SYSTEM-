@@ -97,7 +97,7 @@ src/
 ## Tests
 
 ```bash
-npm test        # 79 unit tests: API client, adapters, formatting, role navigation and tab bar, audit diff, demo logins, on-site check-in, appearance, task due dates, chat threads, assistant Markdown and conversation
+npm test        # 82 unit tests: API client, adapters, formatting, role navigation and tab bar, audit diff, demo logins, on-site check-in, appearance, task due dates, chat threads, assistant Markdown, charts, source links and conversation
 npm run build
 ```
 

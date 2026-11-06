@@ -314,7 +314,7 @@ HR_ADMIN.
 | Method | Path | Who / notes |
 |---|---|---|
 | GET | `/assistant/status` | Managers and HR: `{ enabled, scope: 'company' \| 'team' }` |
-| POST | `/assistant/ask` | `{ messages: [{ role: 'user' \| 'assistant', text }] }`, ending with the question (up to 20 turns). Returns `{ answer, sources }`. Audited; per-person hourly limit; `503` when not configured |
+| POST | `/assistant/ask` | `{ messages: [{ role: 'user' \| 'assistant', text }] }`, ending with the question (up to 20 turns). Returns `{ answer, sources: [{ tool, label }], actions: [{ type, title, details, payload }], followUps }`. Audited; per-person hourly limit; `503` when not configured |
 </details>
 
 <details>
@@ -346,25 +346,38 @@ one address and chat's background polling never lock each other out.
 ## HR assistant
 
 Managers, HR and administrators ask in their own words — *"ملخص الحضور النهارده"*,
-*"who was late most often last month?"* — and Gemini answers from Pollux HR's own data.
+*"which department was late most last month?"*, *"anything I should follow up on?"* — and
+Gemini answers from Pollux HR's own data.
 
-- **The model never touches the database.** It picks among read-only tools
-  ([`assistant.tools.ts`](src/modules/assistant/assistant.tools.ts)): attendance today,
-  the attendance, late, absence, leave, leave-balance and overtime reports, the employee
-  list (HR), my team, requests waiting for a decision, and tasks. Each runs the existing
-  service **as the person asking**, so a manager's questions reach their direct reports
-  only and a scoped HR admin's their entity only — the same rules as the pages, enforced
-  in the same code.
+- **The model never touches the database.** It calls tools that run the existing services
+  **as the person asking**, so a manager's questions reach their direct reports only and a
+  scoped HR admin's their entity only — the same rules as the pages, in the same code:
+  - look-ups ([`assistant.tools.ts`](src/modules/assistant/assistant.tools.ts)): attendance
+    today; the attendance, late, absence, leave, leave-balance and overtime reports; the
+    employee list (HR); my team; requests waiting for a decision; tasks;
+  - analysis ([`assistant.insights.ts`](src/modules/assistant/assistant.insights.ts)):
+    *attention items* (requests waiting > 3 days, pending overtime, people late 3+ times in
+    14 days, absences without leave, missing check-outs, overdue tasks, probation reviews and
+    contracts ending, and for HR expiring documents), attendance rolled up by department /
+    location / work mode with punctuality and absence rates, attendance by day with the
+    average check-in, one person's working profile and balances, public holidays;
+  - actions ([`assistant.actions.ts`](src/modules/assistant/assistant.actions.ts)): *prepare*
+    a task, or an approval or rejection of a pending request. They check everything the real
+    endpoint will (who may assign to whom, who may decide what, a reason to reject) but write
+    nothing: the answer carries the prepared change as a card, and the person's **Confirm**
+    calls `POST /tasks` or `/requests/:id/approve|reject` like the pages do.
 - **No pay.** There is no payroll, payslip, salary or advance tool; no amount is ever sent
   to Google.
-- **Read-only, audited, capped.** It cannot change anything; every question is kept in
-  the audit trail (`AI_QUERY`); each person may ask `AI_ASSISTANT_HOURLY_LIMIT` questions
-  an hour.
-- Names are resolved to people within the caller's reach, and an ambiguous name comes back
-  as candidates for the model to ask about. A refused or invalid look-up (a range too long,
-  someone outside the team) is handed back to the model to explain, not raised.
-- Answers follow the language of the question, name their sources, and are rendered from a
-  small Markdown subset without HTML.
+- **Dates are worked out for the model**: today, yesterday, the previous working day, this /
+  last / next week, this / last month, the last 7 and 30 days, in the office timezone and
+  working week — the easiest way for an answer to be confidently wrong is a wrong range.
+- Answers follow the language of the question, may carry a ```` ```chart ```` block (bars,
+  rendered on the page), end with up to three follow-up questions (returned separately as
+  `followUps`), and name their sources, each linking to the page that shows the data.
+- Names are resolved within the caller's reach; an ambiguous one comes back as candidates.
+  A refused or invalid look-up is handed back to the model to explain, not raised.
+- **Audited and capped:** every question is in the audit trail (`AI_QUERY`); each person may
+  ask `AI_ASSISTANT_HOURLY_LIMIT` questions an hour; at most 8 rounds of look-ups.
 - Without `GOOGLE_API_KEY` the page says it is not switched on and `/assistant/ask` returns
   `503 ASSISTANT_UNAVAILABLE`.
 
@@ -426,7 +439,7 @@ tracked from the day after setup. Walkthrough: [DEPLOYMENT.md, step 4a](../DEPLO
 TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?schema=public npm test
 ```
 
-**347 tests across 19 files**, against a real PostgreSQL test database:
+**353 tests across 19 files**, against a real PostgreSQL test database:
 
 | File | Covers |
 |---|---|
@@ -444,7 +457,7 @@ TEST_DATABASE_URL=postgresql://ems:ems_local_password@localhost:5434/ems_test?sc
 | `clean-start.test.ts` | `db:setup`: reading the accounts, the result, sign-in, single-approver payroll, the wipe guard |
 | `onsite.test.ts` | On-site check-in: distance, network matching, private addresses; QR code, position and network enforced on check-in and check-out; refusals audited; the code hidden from all but HR |
 | `tasks.test.ts` | Who may give a task to whom, the four lists, overdue, assignee vs creator rights, comments, notifications, audit |
-| `assistant.test.ts` | The assistant with a scripted model: who may use it, every tool runs, a manager's tools and results stay inside the team, scoped HR stays in its entity, ambiguous names, refusals passed back, the round limit, failures, audit |
+| `assistant.test.ts` | The assistant with a scripted model: who may use it, every tool runs, a manager's tools and results stay inside the team, scoped HR stays in its entity, ambiguous names, refusals passed back, prepared tasks and decisions that write nothing and respect who may act, date ranges for both working weeks, follow-ups, the round limit, failures, audit |
 | `chat.test.ts` | One direct chat per pair, unread counts, polling with deletions, groups, privacy from HR and admins, per-account rate limit key |
 | `report-export.test.ts` | CSV/Excel/PDF writers, formula-injection neutralising |
 | `working-days.test.ts` | Leave day counting |

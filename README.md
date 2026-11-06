@@ -29,7 +29,7 @@ each judged against their own schedule, timezone and holiday calendar.
 | **Leave** | Requests with a live preview of the working days they cost; HR can record leave on someone's behalf, including leave that has already started, and approve it in one step, and cancel approved leave that was recorded wrongly (with a reason; the days go back to the balance); balances shown as *entitlement + carried − used − pending = available*; UAE holiday calendar by default, other calendars assigned per person |
 | **Payroll** | Monthly runs `Draft → Calculated → Reviewed → Approved → Paid` with four-eyes approval, month locking and admin-only reopen; salary advances repaid in instalments; bonuses and deductions; PDF payslips stored at approval |
 | **Tasks** | Work given to a person by themselves, their manager or HR — priority, due date, *to do → in progress → done*, and a comment thread; lists for *assigned to me*, *assigned by me*, *my team* and (HR) *everyone*, with overdue counted in the office's timezone; the assignee moves a task along, only its creator or HR can rewrite, cancel or delete it; each step notifies the other side |
-| **Assistant** | Managers and HR ask in their own words, in English or Arabic — *"ملخص الحضور النهارده"*, *"who was late most often last month?"*, *"what is waiting for my approval?"* — and Google Gemini answers from Pollux HR's own reports, as the person asking: a manager only ever hears about their own team, and no salary is ever sent to the model. Read-only, every question audited, a *Daily brief* on the dashboard, and any question typed into search can be sent to it |
+| **Assistant** | Managers and HR ask in their own words, in English or Arabic, typed or spoken — *"ملخص الحضور النهارده"*, *"which department was late most last month?"*, *"anything I should follow up on?"* — and Google Gemini answers from Pollux HR's own data, as the person asking: a manager only ever hears about their own team, and no salary is ever sent to the model. It compares departments and days with charts, flags what needs attention (repeated lateness, stale requests, overdue tasks, probation reviews, expiring documents), suggests follow-up questions, links each answer to the page it came from, and can **prepare** a task or an approval for one-click confirmation — it never changes anything itself. Every question audited; *Daily brief* on the dashboard; any question typed into search can be sent to it |
 | **Chat** | One-to-one and group conversations between colleagues: unread counts in the navigation and on the phone tab bar, day separators, unsending your own message, adding people to a group, renaming and leaving it; new messages arrive without a reload. A conversation is readable by its members only — HR and administrators included |
 | **Reports** | Attendance, late arrivals, absence, overtime, leave, leave balance, payroll, salary advances, employees — preview on screen, export as CSV, Excel or PDF, every export audited |
 | **Administration** | Users & roles, audit logs with before/after, company settings — every policy number lives in the database, not in code |
@@ -88,8 +88,10 @@ each judged against their own schedule, timezone and holiday calendar.
   one file, [`services/access.ts`](Employee%20Management%20Platform%20BackEnd/src/services/access.ts),
   and proven by the E2E suite with each role's own token.
 - **Nobody approves their own request, overtime, advance or payroll.**
-- **The assistant sees what you see, and never pay.** It answers through the same
-  services as the pages, run as the person asking, and has no payroll or salary tool.
+- **The assistant sees what you see, never pay, and never acts on its own.** It answers
+  through the same services as the pages, run as the person asking, has no payroll or
+  salary tool, and a task or decision it prepares is carried out only when the person
+  confirms it - through the ordinary endpoint, with its ordinary checks and audit.
 - **Chats are private to their members.** There is no endpoint through which HR or an
   administrator can list or read other people's conversations.
 - **Every sensitive action is audited** — corrections, approvals, payroll steps, exports,
@@ -151,8 +153,8 @@ preinstalled Chromium.
 
 | Suite | Result |
 |---|---|
-| Backend integration — Vitest + Supertest against PostgreSQL | **347 / 347** |
-| Frontend unit — client, adapters, formatting, navigation and the phone tab bar, audit diff, demo logins, on-site helpers, appearance, task due dates, chat threads, assistant answers and conversation | **79 / 79** |
+| Backend integration — Vitest + Supertest against PostgreSQL | **353 / 353** |
+| Frontend unit — client, adapters, formatting, navigation and the phone tab bar, audit diff, demo logins, on-site helpers, appearance, task due dates, chat threads, assistant answers, charts, sources and conversation | **82 / 82** |
 | E2E — Playwright, real stack, 1440×900 and 390×844 | **32 / 32** |
 | Typecheck · backend build · frontend build · migrations from empty + seed | clean |
 

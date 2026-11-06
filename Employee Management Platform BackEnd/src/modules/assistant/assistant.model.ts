@@ -55,8 +55,8 @@ const gemini: AssistantModel = async (request) => {
       // Facts from tools, not invention: keep it steady.
       temperature: 0.2,
       maxOutputTokens: 4096,
-      // Enough thinking to turn "last week" into dates and pick the right tool.
-      thinkingConfig: { thinkingBudget: 1024 },
+      // Room to plan several look-ups and read what the numbers mean.
+      thinkingConfig: { thinkingBudget: 2048 },
     },
   });
   return {

@@ -3,6 +3,7 @@ import { asUser, createFixture, login, resetDatabase, type Fixture } from './fix
 import { prisma } from '../src/db/prisma';
 import { setAssistantModel, type AssistantModel, type ModelRequest } from '../src/modules/assistant/assistant.model';
 import { ASSISTANT_TOOLS } from '../src/modules/assistant/assistant.tools';
+import { calendarContext, splitFollowUps } from '../src/modules/assistant/assistant.service';
 
 /**
  * The HR assistant, with a scripted model in place of Gemini: the script
@@ -26,6 +27,15 @@ function scripted(calls: Call[], seen: ModelRequest[] = []): AssistantModel {
     }
     return { content: { role: 'model', parts: [{ text: 'Done.' }] }, functionCalls: [], text: 'Here is the summary.' };
   };
+}
+
+/** Every result a tool returned, in call order, from the last request the model saw. */
+function allResults(seen: ModelRequest[], name: string): any[] {
+  return seen
+    .at(-1)!
+    .contents.flatMap((content) => content.parts ?? [])
+    .filter((part) => part.functionResponse?.name === name)
+    .map((part) => (part.functionResponse!.response as { result: unknown }).result);
 }
 
 /** What each tool returned, by tool name, from the last request the model saw. */
@@ -87,11 +97,20 @@ describe('HR assistant', () => {
 
     const response = await ask(adminToken, 'ملخص الحضور النهارده');
     expect(response.status).toBe(200);
-    expect(response.body.data).toEqual({ answer: 'Here is the summary.', sources: ['Attendance today', 'Requests waiting for a decision'] });
+    expect(response.body.data).toEqual({
+      answer: 'Here is the summary.',
+      sources: [
+        { tool: 'attendance_today', label: 'Attendance today' },
+        { tool: 'pending_approvals', label: 'Requests waiting for a decision' },
+      ],
+      actions: [],
+      followUps: [],
+    });
 
     // The model is told who is asking, the date, and to answer in their language.
     expect(seen[0]!.systemInstruction).toContain('Ada Admin');
-    expect(seen[0]!.systemInstruction).toMatch(/Today is \w+day \d{4}-\d{2}-\d{2} in Asia\/Dubai/);
+    expect(seen[0]!.systemInstruction).toMatch(/Today: \w{3} \d{1,2} \w{3} \(\d{4}-\d{2}-\d{2}\)/);
+    expect(seen[0]!.systemInstruction).toContain('timezone Asia/Dubai');
     expect(seen[0]!.systemInstruction).toContain('Reply in the language of the user');
 
     const audit = await prisma.auditLog.findFirst({ where: { action: 'AI_QUERY' }, orderBy: { createdAt: 'desc' } });
@@ -112,8 +131,16 @@ describe('HR assistant', () => {
       { name: 'my_team' },
       { name: 'pending_approvals' },
       { name: 'tasks', args: { view: 'all' } },
+      { name: 'attention_items' },
+      { name: 'attendance_by_group', args: { from: '2026-10-01', to: '2026-10-31', groupBy: 'department' } },
+      { name: 'attendance_by_day', args: { from: '2026-11-02', to: '2026-11-06' } },
+      { name: 'employee_profile', args: { person: 'Eve' } },
+      { name: 'holidays', args: { from: '2026-11-01', to: '2026-12-31' } },
+      { name: 'propose_task', args: { person: 'Eve', title: 'Check the Q4 forecast' } },
     ];
-    expect(calls.map((call) => call.name).sort()).toEqual(ASSISTANT_TOOLS.map((tool) => tool.name).sort());
+    // propose_request_decision needs a pending request; it has its own test.
+    const offered = ASSISTANT_TOOLS.map((tool) => tool.name).filter((name) => name !== 'propose_request_decision');
+    expect(calls.map((call) => call.name).sort()).toEqual(offered.sort());
     setAssistantModel(scripted(calls, seen));
 
     expect((await ask(adminToken, 'Everything, please')).status).toBe(200);
@@ -124,6 +151,12 @@ describe('HR assistant', () => {
     }
     expect(results.leave_balances.columns).toContain('Available');
     expect(results.employee_list.rows.length).toBeGreaterThan(0);
+    // Every part of the attention summary ran, none refused.
+    for (const [key, value] of Object.entries(results.attention_items)) expect((value as { error?: string })?.error, key).toBeUndefined();
+    expect(results.attendance_by_group.groups[0]).toMatchObject({ group: 'Engineering' });
+    expect(results.employee_profile).toMatchObject({ name: 'Eve Employee', manager: 'Mo Manager', jobTitle: 'Engineer' });
+    expect(JSON.stringify(results.employee_profile)).not.toMatch(/salary|20000|1990-05-05/i);
+    expect(results.holidays.holidays).toEqual([{ date: '2026-11-04', name: 'Test Holiday', calendar: 'Test UAE Holidays' }]);
   });
 
   it('gives a manager only their team - in the tools offered and in what they return', async () => {
@@ -194,7 +227,7 @@ describe('HR assistant', () => {
     const response = await ask(managerToken, 'Loop forever');
     expect(response.body.data.answer).toBe('Final answer.');
     expect(seen.at(-1)!.tools).toEqual([]);
-    expect(seen.length).toBe(7);
+    expect(seen.length).toBe(9);
   });
 
   it('turns a model failure into a friendly 503', async () => {
@@ -214,5 +247,116 @@ describe('HR assistant', () => {
       .post('/api/v1/assistant/ask')
       .send({ messages: [{ role: 'user', text: 'hi' }, { role: 'assistant', text: 'hello' }] });
     expect(endsWithAnswer.status).toBe(422);
+  });
+
+  describe('preparing changes for the person to confirm', () => {
+    it('prepares a task for someone on the team, and creates nothing', async () => {
+      const before = await prisma.task.count();
+      const seen: ModelRequest[] = [];
+      setAssistantModel(
+        scripted([{ name: 'propose_task', args: { person: 'Eve', title: 'Send the showroom report', dueDate: '2026-11-20', priority: 'HIGH' } }], seen),
+      );
+
+      const response = await ask(managerToken, 'Remind Eve to send the showroom report by the 20th');
+      expect(response.body.data.actions).toEqual([
+        {
+          type: 'create_task',
+          title: 'Task for Eve Employee',
+          details: [
+            { label: 'Task', value: 'Send the showroom report' },
+            { label: 'Due', value: '2026-11-20' },
+            { label: 'Priority', value: 'High' },
+          ],
+          payload: { assigneeId: fixture.employee, title: 'Send the showroom report', description: null, dueDate: '2026-11-20', priority: 'HIGH' },
+        },
+      ]);
+      expect(toolResults(seen).propose_task).toMatchObject({ prepared: true });
+      expect(await prisma.task.count()).toBe(before);
+    });
+
+    it('will not prepare a task for someone outside the team', async () => {
+      const seen: ModelRequest[] = [];
+      setAssistantModel(scripted([{ name: 'propose_task', args: { person: 'Cal', title: 'Fix the printer' } }], seen));
+
+      const response = await ask(managerToken, 'Give Cal a task');
+      expect(response.body.data.actions).toEqual([]);
+      expect(toolResults(seen).propose_task.error).toContain('Nobody called "Cal"');
+    });
+
+    it('prepares a decision only for someone who may make it, and leaves the request pending', async () => {
+      const submitted = await asUser(employeeToken)
+        .post('/api/v1/requests/leave')
+        .send({ leaveTypeId: fixture.annualAe, startDate: '2026-11-16', endDate: '2026-11-17', reason: 'Family visit' });
+      expect(submitted.status).toBe(201);
+      const reference = submitted.body.data.reference as string;
+
+      const seen: ModelRequest[] = [];
+      setAssistantModel(
+        scripted(
+          [
+            { name: 'propose_request_decision', args: { reference: reference.toLowerCase(), decision: 'APPROVE' } },
+            { name: 'propose_request_decision', args: { reference, decision: 'REJECT' } },
+          ],
+          seen,
+        ),
+      );
+      const manager = await ask(managerToken, `Approve ${reference}`);
+      expect(manager.body.data.actions).toHaveLength(1);
+      expect(manager.body.data.actions[0]).toMatchObject({
+        type: 'decide_request',
+        title: `Approve ${reference}`,
+        payload: { reference, decision: 'APPROVE', note: null },
+      });
+      expect(manager.body.data.actions[0].details[0]).toEqual({ label: 'Employee', value: 'Eve Employee' });
+      // Without a reason, a rejection is sent back to ask for one.
+      const [approve, reject] = allResults(seen, 'propose_request_decision');
+      expect(approve).toMatchObject({ prepared: true, decision: 'APPROVE', employee: 'Eve Employee' });
+      expect(reject.error).toBe('A rejection needs a reason the employee will see. Ask the user for one.');
+
+      // HR for another entity is refused.
+      const hrSeen: ModelRequest[] = [];
+      setAssistantModel(scripted([{ name: 'propose_request_decision', args: { reference, decision: 'APPROVE' } }], hrSeen));
+      expect((await ask(hrKsaToken, `Approve ${reference}`)).body.data.actions).toEqual([]);
+      expect(toolResults(hrSeen).propose_request_decision.error).toBe('Only HR or the direct manager can decide this request');
+
+      const status = await prisma.request.findUniqueOrThrow({ where: { reference }, select: { status: true } });
+      expect(status.status).toBe('PENDING');
+    });
+  });
+
+  describe('making the answer easy to use', () => {
+    it('hands follow-up questions back separately', () => {
+      expect(splitFollowUps('Three people were late.\n\nFOLLOW-UPS: Who was late most? | And last week? | Show by department')).toEqual({
+        answer: 'Three people were late.',
+        followUps: ['Who was late most?', 'And last week?', 'Show by department'],
+      });
+      expect(splitFollowUps('No follow-ups here.')).toEqual({ answer: 'No follow-ups here.', followUps: [] });
+      expect(splitFollowUps('تمام\n**Follow-ups:** مين اتأخر؟ | الأسبوع اللي فات؟').followUps).toEqual(['مين اتأخر؟', 'الأسبوع اللي فات؟']);
+    });
+
+    it('works out the periods people mean, for a Monday-Friday and a Sunday-Thursday week', () => {
+      const uae = calendarContext('2026-11-03', [1, 2, 3, 4, 5]);
+      expect(uae).toContain('Today: Tue 3 Nov (2026-11-03)');
+      expect(uae).toContain('the previous working day: Mon 2 Nov (2026-11-02)');
+      expect(uae).toContain('This week: Mon 2 Nov (2026-11-02) to Sun 8 Nov (2026-11-08)');
+      expect(uae).toContain('Last week: Mon 26 Oct (2026-10-26) to Sun 1 Nov (2026-11-01)');
+      expect(uae).toContain('Last month: Thu 1 Oct (2026-10-01) to Sat 31 Oct (2026-10-31)');
+
+      const monday = calendarContext('2026-11-02', [1, 2, 3, 4, 5]);
+      expect(monday).toContain('the previous working day: Fri 30 Oct (2026-10-30)');
+
+      const ksa = calendarContext('2026-11-04', [0, 1, 2, 3, 4]);
+      expect(ksa).toContain('This week: Sun 1 Nov (2026-11-01) to Sat 7 Nov (2026-11-07)');
+      expect(calendarContext('2027-01-12', [1, 2, 3, 4, 5])).toContain('Last month: Tue 1 Dec (2026-12-01) to Thu 31 Dec (2026-12-31)');
+    });
+
+    it('sends the model today’s periods and the departments', async () => {
+      const seen: ModelRequest[] = [];
+      setAssistantModel(scripted([], seen));
+      await ask(adminToken, 'hi');
+      expect(seen[0]!.systemInstruction).toContain('Last week:');
+      expect(seen[0]!.systemInstruction).toContain('Departments: Engineering');
+      expect(seen[0]!.systemInstruction).toContain('FOLLOW-UPS:');
+    });
   });
 });

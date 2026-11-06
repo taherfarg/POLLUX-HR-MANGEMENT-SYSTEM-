@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { assistantSuggestions, forgetConversations, loadConversation, saveConversation } from '../src/lib/assistant.js'
-import { parseInline, parseMarkdown } from '../src/lib/markdown.js'
+import { assistantSuggestions, forgetConversations, loadConversation, normaliseSources, saveConversation, sourcePage } from '../src/lib/assistant.js'
+import { parseChart, parseInline, parseMarkdown } from '../src/lib/markdown.js'
 
 /** A Storage stand-in with the standard key()/length API. */
 function memoryStorage() {
@@ -94,5 +94,49 @@ describe('assistant conversation', () => {
     expect(loadConversation('u1', storage)).toEqual([])
     expect(loadConversation('u1', undefined)).toEqual([])
     expect(() => saveConversation('u1', [{ role: 'user', text: 'x' }], undefined)).not.toThrow()
+  })
+})
+
+describe('assistant charts and sources', () => {
+  it('turns a chart block into bars, and drops one that does not parse', () => {
+    const text = [
+      'Sales was late most.',
+      '```chart',
+      '{"title": "Late days", "unit": "days", "bars": [{"label": "Sales", "value": 6}, {"label": "Finance", "value": "2"}, {"label": "Bad", "value": -1}]}',
+      '```',
+      '```chart',
+      'not json',
+      '```',
+      '```',
+      'plain code',
+      '```',
+    ].join('\n')
+    expect(parseMarkdown(text)).toEqual([
+      { type: 'paragraph', text: 'Sales was late most.' },
+      { type: 'chart', title: 'Late days', unit: 'days', bars: [{ label: 'Sales', value: 6 }, { label: 'Finance', value: 2 }] },
+      { type: 'code', text: 'plain code' },
+    ])
+    const many = { bars: Array.from({ length: 20 }, (_, index) => ({ label: `D${index}`, value: index })) }
+    expect(parseChart(JSON.stringify(many)).bars).toHaveLength(12)
+    expect(parseChart('{"bars": []}')).toBeNull()
+  })
+
+  it('links each source to the page that shows it, if the person has that page', () => {
+    const hr = new Set(['dashboard', 'attendance', 'reports', 'requests', 'tasks', 'employees', 'leave-balances', 'holidays', 'overtime'])
+    const manager = new Set(['home', 'attendance', 'reports', 'requests', 'tasks', 'my-team', 'overtime'])
+    expect(sourcePage('attendance_today', hr)).toBe('attendance')
+    expect(sourcePage('attention_items', hr)).toBe('dashboard')
+    expect(sourcePage('attention_items', manager)).toBe('home')
+    expect(sourcePage('leave_balances', manager)).toBe('my-team')
+    expect(sourcePage('holidays', manager)).toBeNull()
+    expect(sourcePage('unknown', hr)).toBeNull()
+  })
+
+  it('reads sources saved by the first version of the page', () => {
+    expect(normaliseSources(['Attendance today', { tool: 'leave', label: 'Leave report' }])).toEqual([
+      { tool: null, label: 'Attendance today' },
+      { tool: 'leave', label: 'Leave report' },
+    ])
+    expect(normaliseSources(undefined)).toEqual([])
   })
 })

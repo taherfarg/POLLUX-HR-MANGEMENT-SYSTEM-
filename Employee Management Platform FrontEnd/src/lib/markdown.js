@@ -1,9 +1,30 @@
 /**
  * The small part of Markdown the assistant writes - headings, paragraphs,
- * bullet and numbered lists, tables, bold, italic and code - parsed into plain
- * blocks for React to render. No HTML is ever produced from the text, so a
- * name or note in an answer cannot inject markup.
+ * bullet and numbered lists, tables, bold, italic and code, and a ```chart
+ * block - parsed into plain blocks for React to render. No HTML is ever
+ * produced from the text, so a name or note in an answer cannot inject markup.
  */
+
+const MAX_BARS = 12
+
+/**
+ * A ```chart block: {"title", "unit", "bars": [{"label", "value"}]}. One that
+ * does not fit that shape is left out rather than shown as raw JSON - the
+ * answer's text carries the same figures.
+ */
+export function parseChart(source) {
+  try {
+    const chart = JSON.parse(source)
+    const bars = (Array.isArray(chart?.bars) ? chart.bars : [])
+      .filter((bar) => bar && typeof bar.label === 'string' && Number.isFinite(Number(bar.value)) && Number(bar.value) >= 0)
+      .slice(0, MAX_BARS)
+      .map((bar) => ({ label: bar.label, value: Number(bar.value) }))
+    if (!bars.length) return null
+    return { type: 'chart', title: typeof chart.title === 'string' ? chart.title : '', unit: typeof chart.unit === 'string' ? chart.unit : '', bars }
+  } catch {
+    return null
+  }
+}
 
 const TABLE_DIVIDER = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/
 const BULLET = /^\s*[-*•]\s+(.*)$/
@@ -35,6 +56,23 @@ export function parseMarkdown(text) {
 
     if (!trimmed) {
       flush()
+      continue
+    }
+
+    // A fenced block: a chart when it says so and parses, otherwise its text as is.
+    const fence = trimmed.match(/^```\s*([\w-]*)\s*$/)
+    if (fence) {
+      flush()
+      const body = []
+      index += 1
+      while (index < lines.length && !/^```\s*$/.test(lines[index].trim())) {
+        body.push(lines[index])
+        index += 1
+      }
+      const source = body.join('\n')
+      const chart = fence[1] === 'chart' ? parseChart(source) : null
+      if (chart) blocks.push(chart)
+      else if (fence[1] !== 'chart' && source.trim()) blocks.push({ type: 'code', text: source })
       continue
     }
 
